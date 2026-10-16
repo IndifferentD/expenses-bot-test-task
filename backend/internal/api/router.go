@@ -23,6 +23,7 @@ func NewRouter(logger *slog.Logger, handlers Handlers) http.Handler {
 
 	router.Route("/api", func(r chi.Router) {
 		r.Get("/expenses", handlers.Expenses.ListExpenses)
+		r.Get("/expenses/{id}", handlers.Expenses.GetExpense)
 		r.Post("/expenses", handlers.Expenses.CreateExpense)
 		r.Put("/expenses/{id}", handlers.Expenses.UpdateExpense)
 		r.Delete("/expenses/{id}", handlers.Expenses.DeleteExpense)

@@ -46,6 +46,20 @@ func (h *ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 	}{Items: expenses})
 }
 
+func (h *ExpenseHandler) GetExpense(w http.ResponseWriter, r *http.Request) {
+	id, err := expenseID(r)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	expense, err := h.service.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, expense)
+}
+
 func (h *ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	id, err := expenseID(r)
 	if err != nil {

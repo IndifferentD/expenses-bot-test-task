@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -74,6 +76,19 @@ func (r *Repository) List(ctx context.Context) ([]Expense, error) {
 	return expenses, nil
 }
 
+func (r *Repository) Get(ctx context.Context, id int64) (Expense, error) {
+	var expense Expense
+	if err := r.db.GetContext(ctx, &expense, `
+		SELECT id, user_id, amount, category, spent_at, comment, created_at, updated_at
+		FROM expenses WHERE id = ?`, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Expense{}, ErrExpenseNotFound
+		}
+		return Expense{}, fmt.Errorf("failed to get expense: %w", err)
+	}
+	return expense, nil
+}
+
 func (r *Repository) Update(ctx context.Context, expense Expense) (Expense, error) {
 	expense.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	result, err := r.db.NamedExecContext(ctx, `
@@ -91,10 +106,8 @@ func (r *Repository) Update(ctx context.Context, expense Expense) (Expense, erro
 	if count == 0 {
 		return Expense{}, ErrExpenseNotFound
 	}
-	var updated Expense
-	if err := r.db.GetContext(ctx, &updated, `
-		SELECT id, user_id, amount, category, spent_at, comment, created_at, updated_at
-		FROM expenses WHERE id = ?`, expense.ID); err != nil {
+	updated, err := r.Get(ctx, expense.ID)
+	if err != nil {
 		return Expense{}, fmt.Errorf("failed to get updated expense: %w", err)
 	}
 	return updated, nil
