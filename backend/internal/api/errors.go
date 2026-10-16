@@ -3,46 +3,39 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
 	"expenses-bot/backend/internal"
 )
 
-type ErrorCode string
-
 const (
-	CodeInvalidID       ErrorCode = "invalid_id"
-	CodeInvalidBody     ErrorCode = "invalid_body"
-	CodeInvalidJSON     ErrorCode = "invalid_json"
-	CodeInvalidExpense  ErrorCode = "invalid_expense"
-	CodeExpenseNotFound ErrorCode = "expense_not_found"
-	CodeInternalError   ErrorCode = "internal_error"
+	codeInvalidBody     = "invalid_body"
+	codeInvalidJSON     = "invalid_json"
+	codeExpenseNotFound = "expense_not_found"
+	codeInternalError   = "internal_error"
 )
 
-type InputError struct {
-	Code   ErrorCode
+type requestError struct {
+	Code   string
 	Field  string
 	Reason string
 	Cause  error
 }
 
-func (e *InputError) Error() string {
+func (e *requestError) Error() string {
+	message := e.Reason
 	if e.Field != "" {
-		return fmt.Sprintf("%s %s", e.Field, e.Reason)
+		message = e.Field + " " + message
 	}
-	return e.Reason
+	if e.Cause != nil {
+		return message + ": " + e.Cause.Error()
+	}
+	return message
 }
 
-func (e *InputError) Unwrap() error {
+func (e *requestError) Unwrap() error {
 	return e.Cause
-}
-
-func invalidExpenseID(cause error) *InputError {
-	return &InputError{
-		Code: CodeInvalidID, Field: "id", Reason: "must be a positive integer", Cause: cause,
-	}
 }
 
 type problemDetails struct {
@@ -51,7 +44,7 @@ type problemDetails struct {
 	Status        int            `json:"status"`
 	Detail        string         `json:"detail"`
 	Instance      string         `json:"instance"`
-	Code          ErrorCode      `json:"code"`
+	Code          string         `json:"code"`
 	InvalidParams []invalidParam `json:"invalid-params,omitempty"`
 }
 
@@ -61,35 +54,50 @@ type invalidParam struct {
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
-	problem := problemDetails{
-		Type:     "about:blank",
-		Status:   http.StatusInternalServerError,
-		Detail:   "internal server error",
-		Instance: r.URL.Path,
-		Code:     CodeInternalError,
-	}
-	var input *InputError
-	switch {
-	case errors.As(err, &input):
-		problem.Status = http.StatusBadRequest
-		problem.Detail = input.Error()
-		problem.Code = input.Code
-		if input.Field != "" {
-			problem.InvalidParams = []invalidParam{{Name: input.Field, Reason: input.Reason}}
-		}
-	case errors.Is(err, internal.ErrExpenseNotFound):
-		problem.Status = http.StatusNotFound
-		problem.Detail = internal.ErrExpenseNotFound.Error()
-		problem.Code = CodeExpenseNotFound
-	default:
+	problem := problemFromError(err)
+	problem.Instance = r.URL.Path
+	if problem.Status == http.StatusInternalServerError {
 		slog.Error("failed to handle API request", "method", r.Method, "path", r.URL.Path, "error", err)
 	}
-	problem.Title = http.StatusText(problem.Status)
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(problem.Status)
 	if err := json.NewEncoder(w).Encode(problem); err != nil {
 		slog.Error("failed to write error response", "error", err)
 	}
+}
+
+func problemFromError(err error) problemDetails {
+	var requestErr *requestError
+	var validationErr *internal.ValidationError
+	switch {
+	case errors.As(err, &requestErr):
+		return invalidProblem(requestErr.Code, requestErr.Field, requestErr.Reason)
+	case errors.As(err, &validationErr):
+		return invalidProblem(string(validationErr.Code), validationErr.Field, validationErr.Reason)
+	case errors.Is(err, internal.ErrExpenseNotFound):
+		return newProblem(http.StatusNotFound, codeExpenseNotFound, internal.ErrExpenseNotFound.Error())
+	default:
+		return newProblem(http.StatusInternalServerError, codeInternalError, "internal server error")
+	}
+}
+
+func newProblem(status int, code, detail string) problemDetails {
+	return problemDetails{
+		Type:   "about:blank",
+		Title:  http.StatusText(status),
+		Status: status,
+		Detail: detail,
+		Code:   code,
+	}
+}
+
+func invalidProblem(code, field, reason string) problemDetails {
+	problem := newProblem(http.StatusBadRequest, code, reason)
+	if field != "" {
+		problem.Detail = field + " " + reason
+		problem.InvalidParams = []invalidParam{{Name: field, Reason: reason}}
+	}
+	return problem
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -42,8 +41,6 @@ func OpenSQLite(ctx context.Context, path string) (*sqlx.DB, error) {
 type Repository struct {
 	db *sqlx.DB
 }
-
-var ErrExpenseNotFound = errors.New("expense not found")
 
 func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{db: db}

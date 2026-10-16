@@ -13,10 +13,10 @@ import (
 )
 
 type ExpenseHandler struct {
-	service *ExpenseService
+	service *internal.ExpenseService
 }
 
-func NewExpenseHandler(service *ExpenseService) *ExpenseHandler {
+func NewExpenseHandler(service *internal.ExpenseService) *ExpenseHandler {
 	return &ExpenseHandler{service: service}
 }
 
@@ -83,7 +83,9 @@ func (h *ExpenseHandler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
 func expenseID(r *http.Request) (int64, error) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		return 0, fmt.Errorf("failed to get expense id: %w", invalidExpenseID(err))
+		return 0, fmt.Errorf("failed to get expense id: %w", &requestError{
+			Code: string(internal.CodeInvalidID), Field: "id", Reason: "must be a positive integer", Cause: err,
+		})
 	}
 	return id, nil
 }
@@ -91,14 +93,14 @@ func expenseID(r *http.Request) (int64, error) {
 func readExpense(r *http.Request) (internal.Expense, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return internal.Expense{}, fmt.Errorf("failed to read expense request: %w", &InputError{
-			Code: CodeInvalidBody, Reason: "failed to read request body", Cause: err,
+		return internal.Expense{}, fmt.Errorf("failed to read expense request: %w", &requestError{
+			Code: codeInvalidBody, Reason: "failed to read request body", Cause: err,
 		})
 	}
 	var expense internal.Expense
 	if err := json.Unmarshal(body, &expense); err != nil {
-		return internal.Expense{}, fmt.Errorf("failed to decode expense request: %w", &InputError{
-			Code: CodeInvalidJSON, Reason: "invalid JSON request", Cause: err,
+		return internal.Expense{}, fmt.Errorf("failed to decode expense request: %w", &requestError{
+			Code: codeInvalidJSON, Reason: "invalid JSON request", Cause: err,
 		})
 	}
 	return expense, nil

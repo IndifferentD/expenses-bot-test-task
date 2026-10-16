@@ -45,7 +45,7 @@ func main() {
 	defer db.Close()
 
 	repository := internal.NewRepository(db)
-	expenseService := api.NewExpenseService(repository)
+	expenseService := internal.NewExpenseService(repository)
 	handlers := api.Handlers{Expenses: api.NewExpenseHandler(expenseService)}
 	server := &http.Server{
 		Addr:              settings.HTTPAddr,
