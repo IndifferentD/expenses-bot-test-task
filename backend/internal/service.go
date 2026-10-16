@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 type ExpenseRepository interface {
@@ -44,8 +43,8 @@ func validateExpense(expense Expense) error {
 	if !expense.Category.Valid() {
 		return &ValidationError{Code: CodeInvalidExpense, Field: "category", Reason: "must be a valid category"}
 	}
-	if _, err := time.Parse(time.DateOnly, expense.SpentAt); err != nil {
-		return &ValidationError{Code: CodeInvalidExpense, Field: "spent_at", Reason: "must be YYYY-MM-DD", Cause: err}
+	if expense.SpentAt.IsZero() {
+		return &ValidationError{Code: CodeInvalidExpense, Field: "spent_at", Reason: "must be YYYY-MM-DD"}
 	}
 	return nil
 }

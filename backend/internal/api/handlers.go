@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -113,6 +114,11 @@ func readExpense(r *http.Request) (internal.Expense, error) {
 	}
 	var expense internal.Expense
 	if err := json.Unmarshal(body, &expense); err != nil {
+		if errors.Is(err, internal.ErrInvalidDate) {
+			return internal.Expense{}, fmt.Errorf("failed to decode expense date: %w", &requestError{
+				Code: string(internal.CodeInvalidExpense), Field: "spent_at", Reason: "must be YYYY-MM-DD", Cause: err,
+			})
+		}
 		return internal.Expense{}, fmt.Errorf("failed to decode expense request: %w", &requestError{
 			Code: codeInvalidJSON, Reason: "invalid JSON request", Cause: err,
 		})
