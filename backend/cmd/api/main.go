@@ -18,9 +18,9 @@ import (
 )
 
 type Config struct {
-	HTTPAddr string `env:"HTTP_ADDR" envDefault:":8080"`
-	DBPath   string `env:"DB_PATH" envDefault:"./data/expenses.db"`
-	LogLevel string `env:"LOG_LEVEL" envDefault:"INFO"`
+	HTTPAddr    string `env:"HTTP_ADDR" envDefault:":8080"`
+	DatabaseURL string `env:"DATABASE_URL,required"`
+	LogLevel    string `env:"LOG_LEVEL" envDefault:"INFO"`
 }
 
 func main() {
@@ -37,7 +37,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	db, err := internal.OpenSQLite(ctx, settings.DBPath)
+	db, err := internal.ConnectPostgres(ctx, settings.DatabaseURL)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)

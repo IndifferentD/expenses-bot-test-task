@@ -5,34 +5,24 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/vinovest/sqlx"
 )
 
-func OpenSQLite(ctx context.Context, path string) (*sqlx.DB, error) {
-	absPath, err := filepath.Abs(path)
+func ConnectPostgres(ctx context.Context, databaseURL string) (*sqlx.DB, error) {
+	config, err := pgx.ParseConfig(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve database path: %w", err)
+		return nil, fmt.Errorf("failed to parse database connection string: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
-	}
-
-	dsn := url.URL{Scheme: "file", Path: absPath}
-	dsn.RawQuery = url.Values{
-		"_busy_timeout": {"5000"},
-		"_journal_mode": {"WAL"},
-	}.Encode()
-	db, err := sqlx.Open("sqlite3", dsn.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-	db.SetMaxOpenConns(1)
+	config.RuntimeParams["application_name"] = "expenses-api"
+	db := sqlx.NewDb(stdlib.OpenDB(*config), "pgx")
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(time.Hour)
+	db.SetConnMaxIdleTime(15 * time.Minute)
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -49,27 +39,29 @@ func NewRepository(db *sqlx.DB) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, expense Expense) (Expense, error) {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	expense.CreatedAt = now
-	expense.UpdatedAt = now
-	result, err := r.db.NamedExecContext(ctx, `
-		INSERT INTO expenses (user_id, amount, category, spent_at, comment, created_at, updated_at)
-		VALUES (:user_id, :amount, :category, :spent_at, :comment, :created_at, :updated_at)`, expense)
+	spentAt, err := time.Parse(time.DateOnly, expense.SpentAt)
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to parse expense date: %w", err)
+	}
+	var created Expense
+	err = r.db.GetContext(ctx, &created, `
+		INSERT INTO expenses (user_id, amount, category, spent_at, comment)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, user_id, amount, category, spent_at::text AS spent_at,
+			comment, created_at, updated_at`,
+		expense.UserID, expense.Amount, expense.Category, spentAt, expense.Comment,
+	)
 	if err != nil {
 		return Expense{}, fmt.Errorf("failed to insert expense: %w", err)
 	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return Expense{}, fmt.Errorf("failed to get ID of inserted expense: %w", err)
-	}
-	expense.ID = id
-	return expense, nil
+	return created, nil
 }
 
 func (r *Repository) List(ctx context.Context) ([]Expense, error) {
 	expenses := make([]Expense, 0)
 	if err := r.db.SelectContext(ctx, &expenses, `
-		SELECT id, user_id, amount, category, spent_at, comment, created_at, updated_at
+		SELECT id, user_id, amount, category, spent_at::text AS spent_at,
+			comment, created_at, updated_at
 		FROM expenses ORDER BY spent_at DESC, id DESC`); err != nil {
 		return nil, fmt.Errorf("failed to list expenses: %w", err)
 	}
@@ -78,43 +70,45 @@ func (r *Repository) List(ctx context.Context) ([]Expense, error) {
 
 func (r *Repository) Get(ctx context.Context, id int64) (Expense, error) {
 	var expense Expense
-	if err := r.db.GetContext(ctx, &expense, `
-		SELECT id, user_id, amount, category, spent_at, comment, created_at, updated_at
-		FROM expenses WHERE id = ?`, id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Expense{}, ErrExpenseNotFound
-		}
+	err := r.db.GetContext(ctx, &expense, `
+		SELECT id, user_id, amount, category, spent_at::text AS spent_at,
+			comment, created_at, updated_at
+		FROM expenses WHERE id = $1`, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Expense{}, ErrExpenseNotFound
+	}
+	if err != nil {
 		return Expense{}, fmt.Errorf("failed to get expense: %w", err)
 	}
 	return expense, nil
 }
 
 func (r *Repository) Update(ctx context.Context, expense Expense) (Expense, error) {
-	expense.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	result, err := r.db.NamedExecContext(ctx, `
+	spentAt, err := time.Parse(time.DateOnly, expense.SpentAt)
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to parse expense date: %w", err)
+	}
+	var updated Expense
+	err = r.db.GetContext(ctx, &updated, `
 		UPDATE expenses
-		SET user_id = :user_id, amount = :amount, category = :category,
-			spent_at = :spent_at, comment = :comment, updated_at = :updated_at
-		WHERE id = :id`, expense)
-	if err != nil {
-		return Expense{}, fmt.Errorf("failed to update expense: %w", err)
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return Expense{}, fmt.Errorf("failed to check updated expense: %w", err)
-	}
-	if count == 0 {
+		SET user_id = $2, amount = $3, category = $4,
+			spent_at = $5, comment = $6, updated_at = now()
+		WHERE id = $1
+		RETURNING id, user_id, amount, category, spent_at::text AS spent_at,
+			comment, created_at, updated_at`,
+		expense.ID, expense.UserID, expense.Amount, expense.Category, spentAt, expense.Comment,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
 		return Expense{}, ErrExpenseNotFound
 	}
-	updated, err := r.Get(ctx, expense.ID)
 	if err != nil {
-		return Expense{}, fmt.Errorf("failed to get updated expense: %w", err)
+		return Expense{}, fmt.Errorf("failed to update expense: %w", err)
 	}
 	return updated, nil
 }
 
 func (r *Repository) Delete(ctx context.Context, id int64) error {
-	result, err := r.db.ExecContext(ctx, `DELETE FROM expenses WHERE id = ?`, id)
+	result, err := r.db.ExecContext(ctx, `DELETE FROM expenses WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete expense: %w", err)
 	}
