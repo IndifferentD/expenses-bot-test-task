@@ -1,0 +1,105 @@
+package api
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+
+	"expenses-bot/backend/internal"
+
+	"github.com/go-chi/chi/v5"
+)
+
+type ExpenseHandler struct {
+	service *ExpenseService
+}
+
+func NewExpenseHandler(service *ExpenseService) *ExpenseHandler {
+	return &ExpenseHandler{service: service}
+}
+
+func (h *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
+	expense, err := readExpense(r)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	expense, err = h.service.Create(r.Context(), expense)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, expense)
+}
+
+func (h *ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
+	expenses, err := h.service.List(r.Context())
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Items []internal.Expense `json:"items"`
+	}{Items: expenses})
+}
+
+func (h *ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
+	id, err := expenseID(r)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	expense, err := readExpense(r)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	expense.ID = id
+
+	updated, err := h.service.Update(r.Context(), expense)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *ExpenseHandler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
+	id, err := expenseID(r)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	if err := h.service.Delete(r.Context(), id); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func expenseID(r *http.Request) (int64, error) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("failed to get expense id: %w", invalidExpenseID(err))
+	}
+	return id, nil
+}
+
+func readExpense(r *http.Request) (internal.Expense, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return internal.Expense{}, fmt.Errorf("failed to read expense request: %w", &InputError{
+			Code: CodeInvalidBody, Reason: "failed to read request body", Cause: err,
+		})
+	}
+	var expense internal.Expense
+	if err := json.Unmarshal(body, &expense); err != nil {
+		return internal.Expense{}, fmt.Errorf("failed to decode expense request: %w", &InputError{
+			Code: CodeInvalidJSON, Reason: "invalid JSON request", Cause: err,
+		})
+	}
+	return expense, nil
+}
