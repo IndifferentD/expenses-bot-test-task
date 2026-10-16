@@ -5,13 +5,13 @@ import "time"
 type Category string
 
 const (
-	CategoryFood          Category = "еда"
-	CategoryTransport     Category = "транспорт"
-	CategoryHousing       Category = "жильё"
-	CategoryEntertainment Category = "развлечения"
-	CategoryHealth        Category = "здоровье"
-	CategoryShopping      Category = "покупки"
-	CategoryOther         Category = "другое"
+	CategoryFood          Category = "food"
+	CategoryTransport     Category = "transport"
+	CategoryHousing       Category = "housing"
+	CategoryEntertainment Category = "entertainment"
+	CategoryHealth        Category = "health"
+	CategoryShopping      Category = "shopping"
+	CategoryOther         Category = "other"
 )
 
 func (c Category) Valid() bool {
