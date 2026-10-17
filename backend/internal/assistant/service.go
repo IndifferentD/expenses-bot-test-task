@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,28 +53,40 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 }
 
 func expenseReply(created expense.Expense) string {
+	comment := "—"
 	if created.Comment != nil {
-		return fmt.Sprintf("Добавил: %s — %d ₽, %s, %s.", *created.Comment, created.Amount, categoryName(created.Category), created.SpentAt)
+		comment = *created.Comment
 	}
-	return fmt.Sprintf("Добавил трату: %d ₽, %s, %s.", created.Amount, categoryName(created.Category), created.SpentAt)
+	return fmt.Sprintf(
+		"✅ Трата добавлена\n\n💰 Сумма: %s ₽\n🏷 Категория: %s\n📝 Комментарий: %s\n📅 Дата: %s",
+		formatAmount(created.Amount), categoryName(created.Category), comment, created.SpentAt.Format("02.01.2006"),
+	)
+}
+
+func formatAmount(amount int64) string {
+	digits := strconv.FormatInt(amount, 10)
+	for i := len(digits) - 3; i > 0; i -= 3 {
+		digits = digits[:i] + " " + digits[i:]
+	}
+	return digits
 }
 
 func categoryName(category expense.Category) string {
 	switch category {
 	case expense.CategoryFood:
-		return "еда"
+		return "Еда"
 	case expense.CategoryTransport:
-		return "транспорт"
+		return "Транспорт"
 	case expense.CategoryHousing:
-		return "жильё"
+		return "Жильё"
 	case expense.CategoryEntertainment:
-		return "развлечения"
+		return "Развлечения"
 	case expense.CategoryHealth:
-		return "здоровье"
+		return "Здоровье"
 	case expense.CategoryShopping:
-		return "покупки"
+		return "Покупки"
 	default:
-		return "другое"
+		return "Другое"
 	}
 }
 

@@ -64,6 +64,10 @@ func (d Date) String() string {
 	return d.value.Format(time.DateOnly)
 }
 
+func (d Date) Format(layout string) string {
+	return d.value.Format(layout)
+}
+
 func (d *Date) UnmarshalJSON(data []byte) error {
 	var value string
 	if err := json.Unmarshal(data, &value); err != nil {
