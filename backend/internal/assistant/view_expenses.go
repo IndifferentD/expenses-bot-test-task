@@ -12,12 +12,12 @@ import (
 )
 
 type viewExpensesInput struct {
-	Category *expense.Category `json:"category"`
-	Comment  *string           `json:"comment"`
-	DateFrom *string           `json:"date_from"`
-	DateTo   *string           `json:"date_to"`
-	Limit    *int              `json:"limit"`
-	All      bool              `json:"all"`
+	Categories []expense.Category `json:"categories"`
+	Comment    *string            `json:"comment"`
+	DateFrom   *string            `json:"date_from"`
+	DateTo     *string            `json:"date_to"`
+	Limit      *int               `json:"limit"`
+	All        bool               `json:"all"`
 }
 
 const expenseRowsPerMessage = 50
@@ -71,8 +71,14 @@ func (s *Service) summarizeExpenses(ctx context.Context, userID int64, arguments
 	}
 	var reply strings.Builder
 	reply.WriteString("📊 Сводка по тратам\n")
-	if input.Category != nil {
-		fmt.Fprintf(&reply, "🏷 Категория: %s\n", categoryName(*input.Category))
+	if len(input.Categories) == 1 {
+		fmt.Fprintf(&reply, "🏷 Категория: %s\n", categoryName(input.Categories[0]))
+	} else if len(input.Categories) > 1 {
+		names := make([]string, 0, len(input.Categories))
+		for _, category := range input.Categories {
+			names = append(names, categoryName(category))
+		}
+		fmt.Fprintf(&reply, "🏷 Категории: %s\n", strings.Join(names, ", "))
 	}
 	if filter.Comment != "" {
 		fmt.Fprintf(&reply, "📝 Поиск: %s\n", filter.Comment)
@@ -85,10 +91,7 @@ func (s *Service) summarizeExpenses(ctx context.Context, userID int64, arguments
 }
 
 func (input viewExpensesInput) filter(userID int64) (expense.Filter, error) {
-	filter := expense.Filter{UserIDs: []int64{userID}}
-	if input.Category != nil {
-		filter.Categories = []expense.Category{*input.Category}
-	}
+	filter := expense.Filter{UserIDs: []int64{userID}, Categories: input.Categories}
 	if input.Comment != nil {
 		filter.Comment = strings.TrimSpace(*input.Comment)
 	}

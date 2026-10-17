@@ -92,11 +92,11 @@ func listExpensesTool() responses.ToolUnionParam {
 	parameters := map[string]any{
 		"type":                 "object",
 		"properties":           properties,
-		"required":             []string{"category", "comment", "date_from", "date_to", "limit", "all"},
+		"required":             []string{"categories", "comment", "date_from", "date_to", "limit", "all"},
 		"additionalProperties": false,
 	}
 	tool := responses.ToolParamOfFunction("list_expenses", parameters, true)
-	tool.OfFunction.Description = openai.String("Показать траты пользователя с фильтром по категории и периоду.")
+	tool.OfFunction.Description = openai.String("Показать траты пользователя с фильтром по категориям и периоду.")
 	return tool
 }
 
@@ -104,20 +104,20 @@ func summarizeExpensesTool() responses.ToolUnionParam {
 	parameters := map[string]any{
 		"type":                 "object",
 		"properties":           viewFilterProperties(),
-		"required":             []string{"category", "comment", "date_from", "date_to"},
+		"required":             []string{"categories", "comment", "date_from", "date_to"},
 		"additionalProperties": false,
 	}
 	tool := responses.ToolParamOfFunction("summarize_expenses", parameters, true)
-	tool.OfFunction.Description = openai.String("Посчитать сумму и количество трат пользователя за период или по категории.")
+	tool.OfFunction.Description = openai.String("Посчитать сумму и количество трат пользователя за период или по категориям.")
 	return tool
 }
 
 func viewFilterProperties() map[string]any {
 	return map[string]any{
-		"category": map[string]any{
-			"type":        []string{"string", "null"},
-			"enum":        []any{"food", "transport", "housing", "entertainment", "health", "shopping", "other", nil},
-			"description": "Категория из запроса пользователя, иначе null.",
+		"categories": map[string]any{
+			"type":        "array",
+			"items":       map[string]any{"type": "string", "enum": []string{"food", "transport", "housing", "entertainment", "health", "shopping", "other"}},
+			"description": "Все названные категории; если категорий нет, пустой массив.",
 		},
 		"comment":   map[string]any{"type": []string{"string", "null"}, "description": "Предмет покупки или услуга из запроса, иначе null."},
 		"date_from": map[string]any{"type": []string{"string", "null"}, "description": "Начало периода YYYY-MM-DD включительно, иначе null."},
