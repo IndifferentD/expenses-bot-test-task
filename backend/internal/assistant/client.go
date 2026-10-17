@@ -60,17 +60,20 @@ type toolCall struct {
 
 func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Time) (*toolCall, error) {
 	instructions := fmt.Sprintf(
-		"Сегодня %s, часовой пояс %s. Выбирай add_expense только если пользователь просит записать новую трату и указал сумму. "+
-			"Не вызывай инструмент для вопросов, просмотра, изменения, удаления или отрицания записи. "+
-			"Не придумывай сумму, категорию или дату. Относительную дату преобразуй в YYYY-MM-DD; если дата не указана, передай null. "+
-			"В comment укажи только предмет покупки или услугу; если их нельзя определить, передай null.",
+		"Сегодня %s, часовой пояс %s. Выбирай add_expense, только если пользователь просит записать новую трату и указал сумму. "+
+			"Выбирай delete_expense, только если пользователь явно просит удалить трату. "+
+			"Не вызывай инструменты для вопросов, просмотра, изменения или отрицания записи. "+
+			"Не придумывай сумму, категорию, дату или ID. Относительную дату преобразуй в YYYY-MM-DD. "+
+			"В comment укажи только предмет покупки или услугу; если их нельзя определить, передай null. "+
+			"Для удаления извлекай только явно названные признаки траты: comment — короткая дословная часть описания, без перефразирования; "+
+			"category заполняй только если категория названа прямо. Число после # означает ID траты.",
 		sentAt.Format(time.DateOnly), sentAt.Location(),
 	)
 	response, err := s.client.Responses.New(ctx, responses.ResponseNewParams{
 		Model:             s.model,
 		Instructions:      openai.String(instructions),
 		Input:             responses.ResponseNewParamsInputUnion{OfString: openai.String(message)},
-		Tools:             []responses.ToolUnionParam{addExpenseTool()},
+		Tools:             []responses.ToolUnionParam{addExpenseTool(), deleteExpenseTool()},
 		ParallelToolCalls: openai.Bool(false),
 		Store:             openai.Bool(false),
 	})

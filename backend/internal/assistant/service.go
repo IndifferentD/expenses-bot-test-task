@@ -36,7 +36,7 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		return "", fmt.Errorf("failed to interpret message: %w", err)
 	}
 	if call == nil {
-		return "Пока я могу только добавлять траты.", nil
+		return "Пока я могу добавлять и удалять траты.", nil
 	}
 	switch call.name {
 	case "add_expense":
@@ -44,20 +44,26 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		if err != nil {
 			return "", fmt.Errorf("failed to execute add_expense: %w", err)
 		}
-		return expenseReply(created), nil
+		return expenseReply("✅ Трата добавлена", created), nil
+	case "delete_expense":
+		reply, err := s.deleteExpense(ctx, userID, call.arguments)
+		if err != nil {
+			return "", fmt.Errorf("failed to execute delete_expense: %w", err)
+		}
+		return reply, nil
 	default:
 		return "", fmt.Errorf("failed to execute unknown tool %q", call.name)
 	}
 }
 
-func expenseReply(created expense.Expense) string {
+func expenseReply(title string, created expense.Expense) string {
 	comment := "—"
 	if created.Comment != nil {
 		comment = *created.Comment
 	}
 	return fmt.Sprintf(
-		"✅ Трата добавлена\n\n💰 Сумма: %s ₽\n🏷 Категория: %s\n📝 Комментарий: %s\n📅 Дата: %s",
-		formatAmount(created.Amount), categoryName(created.Category), comment, created.SpentAt.Format("02.01.2006"),
+		"%s\n\n💰 Сумма: %s ₽\n🏷 Категория: %s\n📝 Комментарий: %s\n📅 Дата: %s",
+		title, formatAmount(created.Amount), categoryName(created.Category), comment, created.SpentAt.Format("02.01.2006"),
 	)
 }
 

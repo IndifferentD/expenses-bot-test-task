@@ -44,7 +44,7 @@ func (r *Repository) List(ctx context.Context, filter ListFilter) ([]Expense, er
 		SELECT id, user_id, amount, category, spent_at,
 			comment, created_at, updated_at
 		FROM expenses WHERE 1 = 1`
-	args := make([]any, 0, 7)
+	args := make([]any, 0, 9)
 	if len(filter.UserIDs) > 0 {
 		query += " AND user_id IN (?)"
 		args = append(args, filter.UserIDs)
@@ -60,6 +60,14 @@ func (r *Repository) List(ctx context.Context, filter ListFilter) ([]Expense, er
 	if !filter.DateTo.IsZero() {
 		query += " AND spent_at <= ?"
 		args = append(args, filter.DateTo)
+	}
+	if filter.Amount > 0 {
+		query += " AND amount = ?"
+		args = append(args, filter.Amount)
+	}
+	if filter.Comment != "" {
+		query += " AND strpos(lower(coalesce(comment, '')), lower(?)) > 0"
+		args = append(args, filter.Comment)
 	}
 	if filter.Cursor != nil {
 		query += " AND (spent_at, id) < (?, ?)"
@@ -128,6 +136,21 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (r *Repository) DeleteForUser(ctx context.Context, id, userID int64) (Expense, error) {
+	var deleted Expense
+	err := r.db.GetContext(ctx, &deleted, `
+		DELETE FROM expenses WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, amount, category, spent_at,
+			comment, created_at, updated_at`, id, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Expense{}, ErrNotFound
+	}
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to delete user expense: %w", err)
+	}
+	return deleted, nil
 }
 
 func hasConstraint(err error, code, name string) bool {

@@ -13,6 +13,7 @@ type ExpenseRepository interface {
 	Get(context.Context, int64) (Expense, error)
 	Update(context.Context, Expense) (Expense, error)
 	Delete(context.Context, int64) error
+	DeleteForUser(context.Context, int64, int64) (Expense, error)
 }
 
 type ListFilter struct {
@@ -20,6 +21,8 @@ type ListFilter struct {
 	Categories []Category
 	DateFrom   Date
 	DateTo     Date
+	Amount     int64
+	Comment    string
 	Limit      int
 	Cursor     *ListCursor
 }
@@ -94,6 +97,9 @@ func validateListFilter(filter ListFilter) error {
 	if filter.Cursor != nil && (filter.Cursor.ID <= 0 || filter.Cursor.SpentAt.IsZero()) {
 		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "cursor", Reason: "must contain a date and positive expense ID"}
 	}
+	if filter.Amount < 0 {
+		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "amount", Reason: "must not be negative"}
+	}
 	for _, id := range filter.UserIDs {
 		if id <= 0 {
 			return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "user_id", Reason: "must be a positive integer"}
@@ -143,6 +149,20 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("failed to delete expense: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) DeleteForUser(ctx context.Context, id, userID int64) (Expense, error) {
+	if err := validateExpenseID(id); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense ID: %w", err)
+	}
+	if userID <= 0 {
+		return Expense{}, fmt.Errorf("failed to validate expense owner: %w", &internal.ValidationError{Code: internal.CodeInvalidID, Field: "user_id", Reason: "must be a positive integer"})
+	}
+	deleted, err := s.repository.DeleteForUser(ctx, id, userID)
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to delete user expense: %w", err)
+	}
+	return deleted, nil
 }
 
 func validateExpenseID(id int64) error {
