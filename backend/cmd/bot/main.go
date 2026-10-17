@@ -49,14 +49,14 @@ func main() {
 		slog.Error("failed to initialize Telegram bot", "error", err)
 		os.Exit(1)
 	}
-	updates, err := telegramClient.Updates(ctx)
+	updates, err := telegramClient.StartPolling(ctx)
 	if err != nil {
 		slog.Error("failed to receive Telegram updates", "error", err)
 		os.Exit(1)
 	}
 
 	userService := user.NewService(user.NewRepository(database))
-	updateHandler := bot.NewUpdateHandler(userService)
+	updateHandler := bot.NewUpdateHandler(userService, telegramClient)
 	updateHandler.Run(ctx, updates)
 
 	slog.Info("stopped Telegram bot")

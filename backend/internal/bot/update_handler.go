@@ -11,11 +11,12 @@ import (
 )
 
 type UpdateHandler struct {
-	users *user.Service
+	users          *user.Service
+	telegramClient *Client
 }
 
-func NewUpdateHandler(users *user.Service) *UpdateHandler {
-	return &UpdateHandler{users: users}
+func NewUpdateHandler(users *user.Service, telegramClient *Client) *UpdateHandler {
+	return &UpdateHandler{users: users, telegramClient: telegramClient}
 }
 
 func (h *UpdateHandler) Run(ctx context.Context, updates <-chan telego.Update) {
@@ -37,5 +38,8 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 		slog.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
 	default:
 		slog.Info("received Telegram message", "user_id", member.ID, "telegram_user_id", member.TelegramUserID, "text", message.Text)
+		if err := h.telegramClient.SendMessage(ctx, message.Chat.ID, "recieved"); err != nil {
+			slog.Error("failed to acknowledge Telegram message", "chat_id", message.Chat.ID, "error", err)
+		}
 	}
 }

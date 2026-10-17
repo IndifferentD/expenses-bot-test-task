@@ -45,7 +45,7 @@ func NewClient(token, proxyAddress string) (*Client, error) {
 	return &Client{telegramAPI: telegramAPI}, nil
 }
 
-func (c *Client) Updates(ctx context.Context) (<-chan telego.Update, error) {
+func (c *Client) StartPolling(ctx context.Context) (<-chan telego.Update, error) {
 	me, err := c.telegramAPI.GetMe(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Telegram bot API: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
@@ -59,6 +59,17 @@ func (c *Client) Updates(ctx context.Context) (<-chan telego.Update, error) {
 	}
 	slog.Info("starting Telegram bot", "username", me.Username)
 	return updates, nil
+}
+
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
+	_, err := c.telegramAPI.SendMessage(ctx, &telego.SendMessageParams{
+		ChatID: telego.ChatID{ID: chatID},
+		Text:   text,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send Telegram message: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
+	}
+	return nil
 }
 
 type redactedError struct {
