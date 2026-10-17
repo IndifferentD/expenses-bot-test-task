@@ -42,11 +42,7 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 	default:
 		reply, err := h.assistant.ProcessMessage(ctx, member.ID, message.Text, time.Unix(message.Date, 0))
 		if err != nil {
-			if errors.Is(err, assistant.ErrUnrecognized) {
-				slog.Warn("failed to interpret Telegram message", "user_id", member.ID, "error", err)
-			} else {
-				slog.Error("failed to process Telegram message", "user_id", member.ID, "error", err)
-			}
+			slog.Error("failed to process Telegram message", "user_id", member.ID, "error", err)
 			if sendErr := h.telegramClient.SendError(ctx, message.Chat.ID, err.Error()); sendErr != nil {
 				slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", sendErr)
 			}

@@ -15,8 +15,6 @@ import (
 	"github.com/openai/openai-go/v3"
 )
 
-var ErrUnrecognized = errors.New("message could not be handled")
-
 type Service struct {
 	client   openai.Client
 	model    string
@@ -38,7 +36,7 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		return "", fmt.Errorf("failed to interpret message: %w", err)
 	}
 	if call == nil {
-		return "", fmt.Errorf("failed to interpret message without a tool call: %w", ErrUnrecognized)
+		return "Пока я могу только добавлять траты.", nil
 	}
 	switch call.name {
 	case "add_expense":
@@ -49,7 +47,7 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		slog.Info("added expense from assistant message", "user_id", userID, "expense_id", created.ID, "amount", created.Amount, "category", created.Category, "spent_at", created.SpentAt.String())
 		return expenseReply(created), nil
 	default:
-		return "", fmt.Errorf("failed to execute unknown tool %q: %w", call.name, ErrUnrecognized)
+		return "", fmt.Errorf("failed to execute unknown tool %q", call.name)
 	}
 }
 
@@ -89,19 +87,24 @@ func (s *Service) addExpense(ctx context.Context, userID int64, arguments string
 	decoder := json.NewDecoder(strings.NewReader(arguments))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
-		return expense.Expense{}, fmt.Errorf("failed to decode expense details: %w: %v", ErrUnrecognized, err)
+		return expense.Expense{}, fmt.Errorf("failed to decode expense details: %w", err)
 	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return expense.Expense{}, fmt.Errorf("failed to decode expense details: %w", ErrUnrecognized)
+	if err := decoder.Decode(new(any)); err == nil {
+		return expense.Expense{}, errors.New("failed to decode expense details: unexpected data after JSON object")
+	} else if err != io.EOF {
+		return expense.Expense{}, fmt.Errorf("failed to decode expense details: %w", err)
 	}
-	if input.Amount <= 0 || !input.Category.Valid() {
-		return expense.Expense{}, fmt.Errorf("failed to validate expense details: %w", ErrUnrecognized)
+	if input.Amount <= 0 {
+		return expense.Expense{}, errors.New("failed to validate expense details: amount must be positive")
+	}
+	if !input.Category.Valid() {
+		return expense.Expense{}, errors.New("failed to validate expense details: category is invalid")
 	}
 	date := sentAt
 	if input.SpentAt != nil {
 		parsed, err := time.Parse(time.DateOnly, *input.SpentAt)
 		if err != nil {
-			return expense.Expense{}, fmt.Errorf("failed to parse expense date: %w: %v", ErrUnrecognized, err)
+			return expense.Expense{}, fmt.Errorf("failed to parse expense date: %w", err)
 		}
 		date = parsed
 	}

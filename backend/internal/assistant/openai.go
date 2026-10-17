@@ -90,7 +90,7 @@ func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Ti
 			continue
 		}
 		if selected != nil {
-			return nil, fmt.Errorf("failed to select one tool: %w", ErrUnrecognized)
+			return nil, errors.New("failed to select one tool: model returned multiple tool calls")
 		}
 		call := output.AsFunctionCall()
 		selected = &toolCall{name: call.Name, arguments: call.Arguments}
