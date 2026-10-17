@@ -2,8 +2,10 @@ package assistant
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -60,10 +62,11 @@ type toolCall struct {
 
 func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Time) (*toolCall, error) {
 	instructions := fmt.Sprintf(
-		"Сегодня %s, часовой пояс %s. Выбирай add_expense, только если пользователь просит записать новую трату и указал сумму. "+
+		"Сегодня %s, часовой пояс %s. Если сообщение содержит описание траты и сумму, но не указывает явно другое действие, считай его просьбой добавить трату. "+
+			"В таком случае сразу вызывай add_expense без запроса подтверждения. "+
 			"Выбирай delete_expense, только если пользователь явно просит удалить трату. "+
 			"Не вызывай инструменты для вопросов, просмотра, изменения или отрицания записи. "+
-			"Не придумывай сумму, категорию, дату или ID. Относительную дату преобразуй в YYYY-MM-DD. "+
+			"Не придумывай сумму, дату или ID. Категорию определяй по покупке или услуге, а если она неясна — выбирай other. Относительную дату преобразуй в YYYY-MM-DD. "+
 			"В comment укажи только предмет покупки или услугу; если их нельзя определить, передай null. "+
 			"Для удаления извлекай только явно названные признаки траты: comment — короткая дословная часть описания, без перефразирования; "+
 			"category заполняй только если категория названа прямо. Число после # означает ID траты.",
@@ -80,9 +83,15 @@ func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Ti
 	if err != nil {
 		var apiErr *openai.Error
 		if errors.As(err, &apiErr) {
+			if slog.Default().Enabled(ctx, slog.LevelDebug) {
+				slog.DebugContext(ctx, "received OpenAI error response", "model", s.model, "input", message, "response", json.RawMessage(apiErr.RawJSON()))
+			}
 			return nil, fmt.Errorf("failed to request OpenAI response (code: %q, message: %q): %w", apiErr.Code, apiErr.Message, err)
 		}
 		return nil, fmt.Errorf("failed to request OpenAI response: %w", err)
+	}
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		slog.DebugContext(ctx, "received OpenAI response", "model", s.model, "input", message, "response", json.RawMessage(response.RawJSON()))
 	}
 	if response.Status != responses.ResponseStatusCompleted {
 		return nil, fmt.Errorf("failed to complete OpenAI response: status %s", response.Status)
@@ -97,6 +106,9 @@ func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Ti
 		}
 		call := output.AsFunctionCall()
 		selected = &toolCall{name: call.Name, arguments: call.Arguments}
+	}
+	if selected == nil {
+		slog.DebugContext(ctx, "OpenAI response selected no tool", "model", s.model, "input", message)
 	}
 	return selected, nil
 }
