@@ -18,6 +18,7 @@ import (
 
 type Config struct {
 	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN,required"`
+	TelegramProxyURL string `env:"TELEGRAM_PROXY_URL"`
 	DatabaseURL      string `env:"DATABASE_URL,required"`
 	LogLevel         string `env:"LOG_LEVEL" envDefault:"INFO"`
 }
@@ -44,7 +45,7 @@ func main() {
 	defer database.Close()
 
 	userService := user.NewService(user.NewRepository(database))
-	runner, err := bot.New(settings.TelegramBotToken, userService, logger)
+	runner, err := bot.New(settings.TelegramBotToken, settings.TelegramProxyURL, userService, logger)
 	if err != nil {
 		slog.Error("failed to initialize Telegram bot", "error", err)
 		os.Exit(1)

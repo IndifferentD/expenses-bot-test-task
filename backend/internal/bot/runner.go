@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,9 +21,27 @@ type Runner struct {
 	logger   *slog.Logger
 }
 
-func New(token string, users *user.Service, logger *slog.Logger) (*Runner, error) {
+func New(token, proxyAddress string, users *user.Service, logger *slog.Logger) (*Runner, error) {
+	client := &http.Client{Timeout: 35 * time.Second}
+	if proxyAddress != "" {
+		proxyURL, err := url.Parse(proxyAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Telegram proxy URL: %w", err)
+		}
+		if proxyURL.Host == "" {
+			return nil, errors.New("Telegram proxy URL must include a host")
+		}
+		switch proxyURL.Scheme {
+		case "http", "https", "socks5", "socks5h":
+		default:
+			return nil, fmt.Errorf("unsupported Telegram proxy scheme %q", proxyURL.Scheme)
+		}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.Proxy = http.ProxyURL(proxyURL)
+		client.Transport = transport
+	}
 	telegram, err := telego.NewBot(token,
-		telego.WithHTTPClient(&http.Client{Timeout: 35 * time.Second}),
+		telego.WithHTTPClient(client),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure Telegram bot: %w", err)

@@ -45,7 +45,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       LOG_LEVEL: ${LOG_LEVEL}
-      HTTPS_PROXY: ${TELEGRAM_PROXY_URL:-}
+      TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
