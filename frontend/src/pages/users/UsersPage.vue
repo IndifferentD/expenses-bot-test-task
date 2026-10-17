@@ -89,8 +89,7 @@ onMounted(() => { void load(); });
   <main class="page">
     <div class="page-intro">
       <div>
-        <p class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span> Участники</p>
-        <h1>Семья</h1>
+        <h1 class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span> Участники</h1>
         <p class="page-intro__subtitle">Добавьте членов семьи и укажите их Telegram ID, чтобы связывать с ними траты.</p>
       </div>
     </div>

@@ -192,8 +192,7 @@ onMounted(() => { void load(); });
   <main class="page">
     <div class="page-intro">
       <div>
-        <p class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span> Общая картина</p>
-        <h1>Траты семьи</h1>
+        <h1 class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span> Траты семьи</h1>
         <p class="page-intro__subtitle">Все расходы в одном месте — добавляйте, находите и редактируйте записи прямо в таблице.</p>
       </div>
       <div class="summary" aria-label="Сводка расходов">
