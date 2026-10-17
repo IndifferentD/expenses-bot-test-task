@@ -45,7 +45,8 @@ func main() {
 	defer database.Close()
 
 	userService := user.NewService(user.NewRepository(database))
-	runner, err := bot.New(settings.TelegramBotToken, settings.TelegramProxyURL, userService, logger)
+	updateHandler := bot.NewUpdateHandler(userService, logger)
+	runner, err := bot.New(settings.TelegramBotToken, settings.TelegramProxyURL, updateHandler, logger)
 	if err != nil {
 		slog.Error("failed to initialize Telegram bot", "error", err)
 		os.Exit(1)

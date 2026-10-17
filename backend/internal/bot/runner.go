@@ -10,18 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"expenses-bot/backend/internal/user"
-
 	"github.com/mymmrac/telego"
 )
 
 type Runner struct {
 	telegram *telego.Bot
-	users    *user.Service
+	handler  *UpdateHandler
 	logger   *slog.Logger
 }
 
-func New(token, proxyAddress string, users *user.Service, logger *slog.Logger) (*Runner, error) {
+func New(token, proxyAddress string, handler *UpdateHandler, logger *slog.Logger) (*Runner, error) {
 	client := &http.Client{Timeout: 35 * time.Second}
 	if proxyAddress != "" {
 		proxyURL, err := url.Parse(proxyAddress)
@@ -46,38 +44,26 @@ func New(token, proxyAddress string, users *user.Service, logger *slog.Logger) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure Telegram bot: %w", err)
 	}
-	return &Runner{telegram: telegram, users: users, logger: logger}, nil
+	return &Runner{telegram: telegram, handler: handler, logger: logger}, nil
 }
 
-func (b *Runner) Run(ctx context.Context) error {
-	me, err := b.telegram.GetMe(ctx)
+func (r *Runner) Run(ctx context.Context) error {
+	me, err := r.telegram.GetMe(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Telegram bot API: %w", redactedError{cause: err, token: b.telegram.Token()})
+		return fmt.Errorf("failed to connect to Telegram bot API: %w", redactedError{cause: err, token: r.telegram.Token()})
 	}
-	updates, err := b.telegram.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{
+	updates, err := r.telegram.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{
 		Timeout:        30,
 		AllowedUpdates: []string{telego.MessageUpdates},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start Telegram polling: %w", redactedError{cause: err, token: b.telegram.Token()})
+		return fmt.Errorf("failed to start Telegram polling: %w", redactedError{cause: err, token: r.telegram.Token()})
 	}
-	b.logger.Info("starting Telegram bot", "username", me.Username)
+	r.logger.Info("starting Telegram bot", "username", me.Username)
 	for update := range updates {
-		message := update.Message
-		if message == nil || message.Chat.Type != telego.ChatTypePrivate || message.From == nil || message.Text == "" {
-			continue
-		}
-		member, err := b.users.GetByTelegramID(ctx, message.From.ID)
-		switch {
-		case errors.Is(err, user.ErrNotFound):
-			b.logger.Info("ignored message from unknown Telegram user", "telegram_user_id", message.From.ID)
-		case err != nil:
-			b.logger.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
-		default:
-			b.logger.Info("received Telegram message", "user_id", member.ID, "telegram_user_id", member.TelegramUserID, "text", message.Text)
-		}
+		r.handler.Handle(ctx, update)
 	}
-	b.logger.Info("stopped Telegram bot")
+	r.logger.Info("stopped Telegram bot")
 	return nil
 }
 

@@ -1,0 +1,36 @@
+package bot
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+
+	"expenses-bot/backend/internal/user"
+
+	"github.com/mymmrac/telego"
+)
+
+type UpdateHandler struct {
+	users  *user.Service
+	logger *slog.Logger
+}
+
+func NewUpdateHandler(users *user.Service, logger *slog.Logger) *UpdateHandler {
+	return &UpdateHandler{users: users, logger: logger}
+}
+
+func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
+	message := update.Message
+	if message == nil || message.Chat.Type != telego.ChatTypePrivate || message.From == nil || message.Text == "" {
+		return
+	}
+	member, err := h.users.GetByTelegramID(ctx, message.From.ID)
+	switch {
+	case errors.Is(err, user.ErrNotFound):
+		h.logger.Info("ignored message from unknown Telegram user", "telegram_user_id", message.From.ID)
+	case err != nil:
+		h.logger.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
+	default:
+		h.logger.Info("received Telegram message", "user_id", member.ID, "telegram_user_id", member.TelegramUserID, "text", message.Text)
+	}
+}
