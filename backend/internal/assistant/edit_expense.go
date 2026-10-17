@@ -122,16 +122,16 @@ func expenseComment(item expense.Expense) string {
 
 func editExpenseChoices(page expense.ListPage, changes expense.ExpenseChanges) string {
 	var reply strings.Builder
-	reply.WriteString("Нашёл несколько трат:\n\n")
+	reply.WriteString("<p>Нашёл несколько трат:</p>")
 	for _, item := range page.Items {
+		reply.WriteString("<p>")
 		reply.WriteString(html.EscapeString(expenseChoiceLine(item)))
-		reply.WriteByte('\n')
-		fmt.Fprintf(&reply, "<code>%s</code>\n\n", html.EscapeString(editExpenseCommand(item.ID, changes)))
+		fmt.Fprintf(&reply, "<br><code>%s</code></p>", html.EscapeString(editExpenseCommand(item.ID, changes)))
 	}
 	if page.NextCursor != nil {
-		reply.WriteString("Показаны первые пять совпадений.\n\n")
+		reply.WriteString("<p>Показаны первые пять совпадений.</p>")
 	}
-	reply.WriteString("Нажмите на нужную строку, скопируйте её и отправьте боту.")
+	reply.WriteString("<p>Скопируйте команду под нужной тратой и отправьте боту.</p>")
 	return reply.String()
 }
 
