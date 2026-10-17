@@ -336,7 +336,7 @@ onMounted(() => { void load(); });
 
       <div class="panel-footer">
         <span>Показано трат: {{ visibleExpenses.length }}</span>
-        <button v-if="nextCursor && !loadError" class="button button--quiet" type="button" :disabled="loading || loadingMore || isLocked" @click="loadMoreExpenses">
+        <button v-if="nextCursor && !loadError" class="button button--primary" type="button" :disabled="loading || loadingMore || isLocked" @click="loadMoreExpenses">
           {{ loadingMore ? 'Загружаем…' : 'Показать ещё' }}
         </button>
       </div>

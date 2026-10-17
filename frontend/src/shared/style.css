@@ -637,13 +637,18 @@ a:focus-visible {
 }
 
 .panel-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   gap: 16px;
   padding: 16px 26px;
   border-top: 1px solid var(--border-soft);
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.panel-footer > .button {
+  grid-column: 2;
 }
 
 .error-dialog {
