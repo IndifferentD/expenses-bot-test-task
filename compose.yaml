@@ -46,6 +46,11 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       LOG_LEVEL: ${LOG_LEVEL}
       TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-luna}
+      OPENAI_PROXY_URL: ${OPENAI_PROXY_URL:-}
+      TIMEZONE: ${TIMEZONE:-Europe/Moscow}
     depends_on:
       migrate:
         condition: service_completed_successfully
