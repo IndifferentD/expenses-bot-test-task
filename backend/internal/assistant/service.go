@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +44,6 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		if err != nil {
 			return "", fmt.Errorf("failed to execute add_expense: %w", err)
 		}
-		slog.Info("added expense from assistant message", "user_id", userID, "expense_id", created.ID, "amount", created.Amount, "category", created.Category, "spent_at", created.SpentAt.String())
 		return expenseReply(created), nil
 	default:
 		return "", fmt.Errorf("failed to execute unknown tool %q", call.name)
@@ -90,51 +88,17 @@ func categoryName(category expense.Category) string {
 	}
 }
 
-func (s *Service) addExpense(ctx context.Context, userID int64, arguments string, sentAt time.Time) (expense.Expense, error) {
-	var input struct {
-		Amount   int64            `json:"amount"`
-		Category expense.Category `json:"category"`
-		SpentAt  *string          `json:"spent_at"`
-		Comment  *string          `json:"comment"`
-	}
+func decodeArguments(arguments string, target any) error {
 	decoder := json.NewDecoder(strings.NewReader(arguments))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		return expense.Expense{}, fmt.Errorf("failed to decode expense details: %w", err)
+	if err := decoder.Decode(target); err != nil {
+		return err
 	}
-	if err := decoder.Decode(new(any)); err == nil {
-		return expense.Expense{}, errors.New("failed to decode expense details: unexpected data after JSON object")
-	} else if err != io.EOF {
-		return expense.Expense{}, fmt.Errorf("failed to decode expense details: %w", err)
-	}
-	if input.Amount <= 0 {
-		return expense.Expense{}, errors.New("failed to validate expense details: amount must be positive")
-	}
-	if !input.Category.Valid() {
-		return expense.Expense{}, errors.New("failed to validate expense details: category is invalid")
-	}
-	date := sentAt
-	if input.SpentAt != nil {
-		parsed, err := time.Parse(time.DateOnly, *input.SpentAt)
-		if err != nil {
-			return expense.Expense{}, fmt.Errorf("failed to parse expense date: %w", err)
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		if err == nil {
+			return errors.New("unexpected data after JSON object")
 		}
-		date = parsed
+		return err
 	}
-	newExpense := expense.Expense{
-		UserID:   userID,
-		Amount:   input.Amount,
-		Category: input.Category,
-		SpentAt:  expense.NewDate(date),
-	}
-	if input.Comment != nil {
-		if comment := strings.TrimSpace(*input.Comment); comment != "" {
-			newExpense.Comment = &comment
-		}
-	}
-	created, err := s.expenses.Create(ctx, newExpense)
-	if err != nil {
-		return expense.Expense{}, fmt.Errorf("failed to save recognized expense: %w", err)
-	}
-	return created, nil
+	return nil
 }
