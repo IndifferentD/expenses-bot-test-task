@@ -38,12 +38,40 @@ func (r *Repository) Create(ctx context.Context, expense Expense) (Expense, erro
 	return created, nil
 }
 
-func (r *Repository) List(ctx context.Context) ([]Expense, error) {
+func (r *Repository) List(ctx context.Context, filter ListFilter) ([]Expense, error) {
 	expenses := make([]Expense, 0)
-	if err := r.db.SelectContext(ctx, &expenses, `
+	query := `
 		SELECT id, user_id, amount, category, spent_at,
 			comment, created_at, updated_at
-		FROM expenses ORDER BY spent_at DESC, id DESC`); err != nil {
+		FROM expenses WHERE 1 = 1`
+	args := make([]any, 0, 7)
+	if len(filter.UserIDs) > 0 {
+		query += " AND user_id IN (?)"
+		args = append(args, filter.UserIDs)
+	}
+	if len(filter.Categories) > 0 {
+		query += " AND category IN (?)"
+		args = append(args, filter.Categories)
+	}
+	if !filter.DateFrom.IsZero() {
+		query += " AND spent_at >= ?"
+		args = append(args, filter.DateFrom)
+	}
+	if !filter.DateTo.IsZero() {
+		query += " AND spent_at <= ?"
+		args = append(args, filter.DateTo)
+	}
+	if filter.Cursor != nil {
+		query += " AND (spent_at, id) < (?, ?)"
+		args = append(args, filter.Cursor.SpentAt, filter.Cursor.ID)
+	}
+	query += " ORDER BY spent_at DESC, id DESC LIMIT ?"
+	args = append(args, filter.Limit+1)
+	query, args, err := sqlx.In(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build expense filter query: %w", err)
+	}
+	if err := r.db.SelectContext(ctx, &expenses, r.db.Rebind(query), args...); err != nil {
 		return nil, fmt.Errorf("failed to list expenses: %w", err)
 	}
 	return expenses, nil

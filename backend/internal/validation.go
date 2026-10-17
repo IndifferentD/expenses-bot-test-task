@@ -6,6 +6,7 @@ const (
 	CodeInvalidID      ValidationCode = "invalid_id"
 	CodeInvalidExpense ValidationCode = "invalid_expense"
 	CodeInvalidUser    ValidationCode = "invalid_user"
+	CodeInvalidFilter  ValidationCode = "invalid_filter"
 )
 
 type ValidationError struct {

@@ -9,10 +9,29 @@ import (
 
 type ExpenseRepository interface {
 	Create(context.Context, Expense) (Expense, error)
-	List(context.Context) ([]Expense, error)
+	List(context.Context, ListFilter) ([]Expense, error)
 	Get(context.Context, int64) (Expense, error)
 	Update(context.Context, Expense) (Expense, error)
 	Delete(context.Context, int64) error
+}
+
+type ListFilter struct {
+	UserIDs    []int64
+	Categories []Category
+	DateFrom   Date
+	DateTo     Date
+	Limit      int
+	Cursor     *ListCursor
+}
+
+type ListCursor struct {
+	SpentAt Date
+	ID      int64
+}
+
+type ListPage struct {
+	Items      []Expense
+	NextCursor *ListCursor
 }
 
 type Service struct {
@@ -51,12 +70,44 @@ func validateExpense(expense Expense) error {
 	return nil
 }
 
-func (s *Service) List(ctx context.Context) ([]Expense, error) {
-	expenses, err := s.repository.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list expenses: %w", err)
+func (s *Service) List(ctx context.Context, filter ListFilter) (ListPage, error) {
+	if err := validateListFilter(filter); err != nil {
+		return ListPage{}, fmt.Errorf("failed to validate expense filter: %w", err)
 	}
-	return expenses, nil
+	expenses, err := s.repository.List(ctx, filter)
+	if err != nil {
+		return ListPage{}, fmt.Errorf("failed to list expenses: %w", err)
+	}
+	page := ListPage{Items: expenses}
+	if len(expenses) > filter.Limit {
+		page.Items = expenses[:filter.Limit]
+		last := page.Items[len(page.Items)-1]
+		page.NextCursor = &ListCursor{SpentAt: last.SpentAt, ID: last.ID}
+	}
+	return page, nil
+}
+
+func validateListFilter(filter ListFilter) error {
+	if filter.Limit < 1 || filter.Limit > 100 {
+		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "limit", Reason: "must be between 1 and 100"}
+	}
+	if filter.Cursor != nil && (filter.Cursor.ID <= 0 || filter.Cursor.SpentAt.IsZero()) {
+		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "cursor", Reason: "must contain a date and positive expense ID"}
+	}
+	for _, id := range filter.UserIDs {
+		if id <= 0 {
+			return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "user_id", Reason: "must be a positive integer"}
+		}
+	}
+	for _, category := range filter.Categories {
+		if !category.Valid() {
+			return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "category", Reason: "must be a valid category"}
+		}
+	}
+	if !filter.DateFrom.IsZero() && !filter.DateTo.IsZero() && filter.DateTo.Before(filter.DateFrom) {
+		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "date_to", Reason: "must not be before date_from"}
+	}
+	return nil
 }
 
 func (s *Service) Get(ctx context.Context, id int64) (Expense, error) {

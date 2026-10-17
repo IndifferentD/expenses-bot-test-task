@@ -56,6 +56,14 @@ func (d Date) IsZero() bool {
 	return d.value.IsZero()
 }
 
+func (d Date) Before(other Date) bool {
+	return d.value.Before(other.value)
+}
+
+func (d Date) String() string {
+	return d.value.Format(time.DateOnly)
+}
+
 func (d *Date) UnmarshalJSON(data []byte) error {
 	var value string
 	if err := json.Unmarshal(data, &value); err != nil {

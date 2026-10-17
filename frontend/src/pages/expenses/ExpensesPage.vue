@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { expensesApi } from '../../entities/expense/expensesApi';
+import { computed, onMounted, ref, watch } from 'vue';
+import { expensesApi, type ExpenseFilters } from '../../entities/expense/expensesApi';
 import ExpenseRow from '../../entities/expense/ExpenseRow.vue';
 import { categoryOptions, formatAmount, type Category, type Expense, type ExpenseInput } from '../../entities/expense/expense';
 import { usersApi } from '../../entities/user/usersApi';
@@ -9,21 +9,27 @@ import ErrorDialog from '../../shared/ErrorDialog.vue';
 
 const expenses = ref<Expense[]>([]);
 const users = ref<User[]>([]);
-const loading = ref(true);
-const loadError = ref<string | null>(null);
+const expensesLoading = ref(true);
+const usersLoading = ref(true);
+const expensesLoadError = ref<string | null>(null);
+const usersLoadError = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
 const adding = ref(false);
 const editingId = ref<number | null>(null);
 const savingKey = ref<number | 'new' | null>(null);
 const deletingId = ref<number | null>(null);
+const nextCursor = ref<string | null>(null);
+const loadingMore = ref(false);
 
 const selectedUserIds = ref<number[]>([]);
-const categoryFilter = ref<Category | ''>('');
+const selectedCategories = ref<Category[]>([]);
 const dateFrom = ref('');
 const dateTo = ref('');
 
 const isLocked = computed(() => adding.value || editingId.value !== null || savingKey.value !== null || deletingId.value !== null);
-const hasFilters = computed(() => Boolean(selectedUserIds.value.length || categoryFilter.value || dateFrom.value || dateTo.value));
+const loading = computed(() => expensesLoading.value || usersLoading.value);
+const loadError = computed(() => expensesLoadError.value || usersLoadError.value);
+const hasFilters = computed(() => Boolean(selectedUserIds.value.length || selectedCategories.value.length || dateFrom.value || dateTo.value));
 const invalidPeriod = computed(() => Boolean(dateFrom.value && dateTo.value && dateFrom.value > dateTo.value));
 const userFilterLabel = computed(() => {
   if (selectedUserIds.value.length === 0) return 'Все участники';
@@ -32,42 +38,97 @@ const userFilterLabel = computed(() => {
   }
   return `Выбрано: ${selectedUserIds.value.length}`;
 });
+const categoryFilterLabel = computed(() => {
+  if (selectedCategories.value.length === 0) return 'Все категории';
+  if (selectedCategories.value.length === 1) {
+    return categoryOptions.find((option) => option.value === selectedCategories.value[0])?.label ?? '1 категория';
+  }
+  return `Выбрано: ${selectedCategories.value.length}`;
+});
 
 function matchesFilters(expense: Expense): boolean {
   return (selectedUserIds.value.length === 0 || selectedUserIds.value.includes(expense.user_id))
-    && (!categoryFilter.value || expense.category === categoryFilter.value)
+    && (selectedCategories.value.length === 0 || selectedCategories.value.includes(expense.category))
     && (!dateFrom.value || expense.spent_at >= dateFrom.value)
     && (!dateTo.value || expense.spent_at <= dateTo.value);
 }
 
-const visibleExpenses = computed(() => invalidPeriod.value ? [] : expenses.value.filter(matchesFilters));
+const visibleExpenses = computed(() => invalidPeriod.value ? [] : expenses.value);
 const visibleAmount = computed(() => visibleExpenses.value.reduce((sum, expense) => sum + expense.amount, 0));
-
-function sortExpenses(items: Expense[]): Expense[] {
-  return [...items].sort((a, b) => b.spent_at.localeCompare(a.spent_at) || b.id - a.id);
-}
 
 function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : 'Произошла неизвестная ошибка.';
 }
 
-async function load(): Promise<void> {
-  loading.value = true;
-  loadError.value = null;
-  try {
-    const [loadedExpenses, loadedUsers] = await Promise.all([expensesApi.list(), usersApi.list()]);
-    expenses.value = sortExpenses(loadedExpenses);
-    users.value = loadedUsers;
-  } catch (error) {
-    loadError.value = messageFrom(error);
-  } finally {
-    loading.value = false;
+let latestExpenseRequest = 0;
+
+function currentFilters(): ExpenseFilters {
+  return {
+    userIds: selectedUserIds.value,
+    categories: selectedCategories.value,
+    dateFrom: dateFrom.value,
+    dateTo: dateTo.value,
+  };
+}
+
+async function loadExpenses(): Promise<void> {
+  const requestId = ++latestExpenseRequest;
+  expensesLoading.value = true;
+  expensesLoadError.value = null;
+  nextCursor.value = null;
+  if (invalidPeriod.value) {
+    expenses.value = [];
+    expensesLoading.value = false;
+    return;
   }
+  try {
+    const page = await expensesApi.list(currentFilters());
+    if (requestId !== latestExpenseRequest) return;
+    expenses.value = page.items;
+    nextCursor.value = page.next_cursor;
+  } catch (error) {
+    if (requestId === latestExpenseRequest) expensesLoadError.value = messageFrom(error);
+  } finally {
+    if (requestId === latestExpenseRequest) expensesLoading.value = false;
+  }
+}
+
+async function loadMoreExpenses(): Promise<void> {
+  if (!nextCursor.value || loading.value || loadingMore.value || isLocked.value) return;
+  const requestId = latestExpenseRequest;
+  const cursor = nextCursor.value;
+  loadingMore.value = true;
+  try {
+    const page = await expensesApi.list(currentFilters(), cursor);
+    if (requestId !== latestExpenseRequest) return;
+    expenses.value = [...expenses.value, ...page.items];
+    nextCursor.value = page.next_cursor;
+  } catch (error) {
+    if (requestId === latestExpenseRequest) errorMessage.value = messageFrom(error);
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
+async function loadUsers(): Promise<void> {
+  usersLoading.value = true;
+  usersLoadError.value = null;
+  try {
+    users.value = await usersApi.list();
+  } catch (error) {
+    usersLoadError.value = messageFrom(error);
+  } finally {
+    usersLoading.value = false;
+  }
+}
+
+async function load(): Promise<void> {
+  await Promise.all([loadExpenses(), loadUsers()]);
 }
 
 function clearFilters(): void {
   selectedUserIds.value = [];
-  categoryFilter.value = '';
+  selectedCategories.value = [];
   dateFrom.value = '';
   dateTo.value = '';
 }
@@ -85,8 +146,8 @@ async function saveNew(input: ExpenseInput): Promise<void> {
   savingKey.value = 'new';
   try {
     const created = await expensesApi.create(input);
-    expenses.value = sortExpenses([...expenses.value, created]);
-    if (!matchesFilters(created)) clearFilters();
+    if (matchesFilters(created)) void loadExpenses();
+    else clearFilters();
     adding.value = false;
   } catch (error) {
     errorMessage.value = messageFrom(error);
@@ -100,8 +161,8 @@ async function saveExisting(id: number, input: ExpenseInput): Promise<void> {
   savingKey.value = id;
   try {
     const updated = await expensesApi.update(id, input);
-    expenses.value = sortExpenses(expenses.value.map((expense) => expense.id === id ? updated : expense));
-    if (!matchesFilters(updated)) clearFilters();
+    if (matchesFilters(updated)) void loadExpenses();
+    else clearFilters();
     editingId.value = null;
   } catch (error) {
     errorMessage.value = messageFrom(error);
@@ -115,7 +176,7 @@ async function remove(expense: Expense): Promise<void> {
   deletingId.value = expense.id;
   try {
     await expensesApi.remove(expense.id);
-    expenses.value = expenses.value.filter((item) => item.id !== expense.id);
+    void loadExpenses();
   } catch (error) {
     errorMessage.value = messageFrom(error);
   } finally {
@@ -123,6 +184,7 @@ async function remove(expense: Expense): Promise<void> {
   }
 }
 
+watch([selectedUserIds, selectedCategories, dateFrom, dateTo], () => { void loadExpenses(); }, { deep: true });
 onMounted(() => { void load(); });
 </script>
 
@@ -136,12 +198,12 @@ onMounted(() => { void load(); });
       </div>
       <div class="summary" aria-label="Сводка расходов">
         <div class="summary__item">
-          <span>Записей</span>
+          <span>Загружено записей</span>
           <strong>{{ formatAmount(visibleExpenses.length) }}</strong>
         </div>
         <div class="summary__divider" aria-hidden="true"></div>
         <div class="summary__item">
-          <span>Сумма</span>
+          <span>Сумма загруженных</span>
           <strong>{{ formatAmount(visibleAmount) }}</strong>
         </div>
       </div>
@@ -187,11 +249,18 @@ onMounted(() => { void load(); });
           </details>
         </div>
         <div class="filter-field">
-          <label for="filter-category">Категория</label>
-          <select id="filter-category" v-model="categoryFilter" class="filter-control" :disabled="isLocked">
-            <option value="">Все категории</option>
-            <option v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-          </select>
+          <span class="filter-label">Категория</span>
+          <details class="multi-select">
+            <summary class="filter-control multi-select__trigger" :aria-disabled="isLocked" :tabindex="isLocked ? -1 : 0" @click="isLocked && $event.preventDefault()">
+              {{ categoryFilterLabel }}
+            </summary>
+            <div class="multi-select__menu">
+              <label v-for="option in categoryOptions" :key="option.value" class="multi-select__option">
+                <input v-model="selectedCategories" type="checkbox" :value="option.value" :disabled="isLocked" />
+                <span>{{ option.label }}</span>
+              </label>
+            </div>
+          </details>
         </div>
         <div class="filter-field">
           <label for="filter-from">Дата с</label>
@@ -266,7 +335,10 @@ onMounted(() => { void load(); });
       </div>
 
       <div class="panel-footer">
-        <span>Показано {{ visibleExpenses.length }} из {{ expenses.length }}</span>
+        <span>Показано трат: {{ visibleExpenses.length }}</span>
+        <button v-if="nextCursor && !loadError" class="button button--quiet" type="button" :disabled="loading || loadingMore || isLocked" @click="loadMoreExpenses">
+          {{ loadingMore ? 'Загружаем…' : 'Показать ещё' }}
+        </button>
       </div>
     </section>
 
