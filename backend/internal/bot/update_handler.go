@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
+	"expenses-bot/backend/internal/assistant"
 	"expenses-bot/backend/internal/user"
 
 	"github.com/mymmrac/telego"
@@ -12,11 +14,12 @@ import (
 
 type UpdateHandler struct {
 	users          *user.Service
+	assistant      *assistant.Service
 	telegramClient *Client
 }
 
-func NewUpdateHandler(users *user.Service, telegramClient *Client) *UpdateHandler {
-	return &UpdateHandler{users: users, telegramClient: telegramClient}
+func NewUpdateHandler(users *user.Service, assistant *assistant.Service, telegramClient *Client) *UpdateHandler {
+	return &UpdateHandler{users: users, assistant: assistant, telegramClient: telegramClient}
 }
 
 func (h *UpdateHandler) Run(ctx context.Context, updates <-chan telego.Update) {
@@ -37,9 +40,20 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 	case err != nil:
 		slog.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
 	default:
-		slog.Info("received Telegram message", "user_id", member.ID, "telegram_user_id", member.TelegramUserID, "text", message.Text)
-		if err := h.telegramClient.SendMessage(ctx, message.Chat.ID, "recieved"); err != nil {
-			slog.Error("failed to acknowledge Telegram message", "chat_id", message.Chat.ID, "error", err)
+		reply, err := h.assistant.ProcessMessage(ctx, member.ID, message.Text, time.Unix(message.Date, 0))
+		if err != nil {
+			if errors.Is(err, assistant.ErrUnrecognized) {
+				slog.Warn("failed to interpret Telegram message", "user_id", member.ID, "error", err)
+			} else {
+				slog.Error("failed to process Telegram message", "user_id", member.ID, "error", err)
+			}
+			if sendErr := h.telegramClient.SendError(ctx, message.Chat.ID, err.Error()); sendErr != nil {
+				slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", sendErr)
+			}
+			return
+		}
+		if err := h.telegramClient.SendMessage(ctx, message.Chat.ID, reply); err != nil {
+			slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", err)
 		}
 	}
 }

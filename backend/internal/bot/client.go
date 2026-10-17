@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/mymmrac/telego"
@@ -48,16 +48,16 @@ func NewClient(token, proxyAddress string) (*Client, error) {
 func (c *Client) StartPolling(ctx context.Context) (<-chan telego.Update, error) {
 	me, err := c.telegramAPI.GetMe(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Telegram bot API: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
+		return nil, fmt.Errorf("failed to connect to Telegram bot API: %w", err)
 	}
 	updates, err := c.telegramAPI.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{
 		Timeout:        30,
 		AllowedUpdates: []string{telego.MessageUpdates},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start Telegram polling: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
+		return nil, fmt.Errorf("failed to start Telegram polling: %w", err)
 	}
-	slog.Info("starting Telegram bot", "username", me.Username)
+	slog.Info("started Telegram bot", "username", me.Username)
 	return updates, nil
 }
 
@@ -67,27 +67,19 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) err
 		Text:   text,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to send Telegram message: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
+		return fmt.Errorf("failed to send Telegram message: %w", err)
 	}
 	return nil
 }
 
-type redactedError struct {
-	cause error
-	token string
-}
-
-func (e redactedError) Error() string {
-	return redactToken(e.cause.Error(), e.token)
-}
-
-func (e redactedError) Unwrap() error {
-	return e.cause
-}
-
-func redactToken(message, token string) string {
-	if token == "" {
-		return message
+func (c *Client) SendError(ctx context.Context, chatID int64, message string) error {
+	_, err := c.telegramAPI.SendMessage(ctx, &telego.SendMessageParams{
+		ChatID:    telego.ChatID{ID: chatID},
+		Text:      "Не удалось обработать запрос:\n<pre>" + html.EscapeString(message) + "</pre>",
+		ParseMode: telego.ModeHTML,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send Telegram error message: %w", err)
 	}
-	return strings.ReplaceAll(message, token, "[REDACTED]")
+	return nil
 }
