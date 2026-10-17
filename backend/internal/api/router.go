@@ -11,6 +11,7 @@ import (
 
 type Handlers struct {
 	Expenses *ExpenseHandler
+	Users    *UserHandler
 }
 
 func NewRouter(logger *slog.Logger, handlers Handlers) http.Handler {
@@ -27,6 +28,11 @@ func NewRouter(logger *slog.Logger, handlers Handlers) http.Handler {
 		r.Post("/expenses", handlers.Expenses.CreateExpense)
 		r.Put("/expenses/{id}", handlers.Expenses.UpdateExpense)
 		r.Delete("/expenses/{id}", handlers.Expenses.DeleteExpense)
+		r.Get("/users", handlers.Users.ListUsers)
+		r.Get("/users/{id}", handlers.Users.GetUser)
+		r.Post("/users", handlers.Users.CreateUser)
+		r.Put("/users/{id}", handlers.Users.UpdateUser)
+		r.Delete("/users/{id}", handlers.Users.DeleteUser)
 	})
 	return router
 }

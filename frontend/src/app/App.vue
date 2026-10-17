@@ -17,6 +17,7 @@ import { RouterLink, RouterView } from 'vue-router';
 
         <nav class="site-nav" aria-label="Основная навигация">
           <RouterLink to="/expenses" active-class="site-nav__link--active" class="site-nav__link">Траты</RouterLink>
+          <RouterLink to="/users" active-class="site-nav__link--active" class="site-nav__link">Семья</RouterLink>
         </nav>
       </div>
     </header>

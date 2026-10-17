@@ -3,9 +3,12 @@ import { computed, onMounted, ref } from 'vue';
 import { expensesApi } from '../../entities/expense/expensesApi';
 import ExpenseRow from '../../entities/expense/ExpenseRow.vue';
 import { categoryOptions, formatAmount, type Category, type Expense, type ExpenseInput } from '../../entities/expense/expense';
+import { usersApi } from '../../entities/user/usersApi';
+import type { User } from '../../entities/user/user';
 import ErrorDialog from '../../shared/ErrorDialog.vue';
 
 const expenses = ref<Expense[]>([]);
+const users = ref<User[]>([]);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
@@ -14,18 +17,24 @@ const editingId = ref<number | null>(null);
 const savingKey = ref<number | 'new' | null>(null);
 const deletingId = ref<number | null>(null);
 
-const userFilter = ref('');
+const selectedUserIds = ref<number[]>([]);
 const categoryFilter = ref<Category | ''>('');
 const dateFrom = ref('');
 const dateTo = ref('');
 
 const isLocked = computed(() => adding.value || editingId.value !== null || savingKey.value !== null || deletingId.value !== null);
-const hasFilters = computed(() => Boolean(userFilter.value || categoryFilter.value || dateFrom.value || dateTo.value));
+const hasFilters = computed(() => Boolean(selectedUserIds.value.length || categoryFilter.value || dateFrom.value || dateTo.value));
 const invalidPeriod = computed(() => Boolean(dateFrom.value && dateTo.value && dateFrom.value > dateTo.value));
-const users = computed(() => [...new Set(expenses.value.map((expense) => expense.user_id))].sort((a, b) => a - b));
+const userFilterLabel = computed(() => {
+  if (selectedUserIds.value.length === 0) return 'Все участники';
+  if (selectedUserIds.value.length === 1) {
+    return users.value.find((user) => user.id === selectedUserIds.value[0])?.alias ?? '1 участник';
+  }
+  return `Выбрано: ${selectedUserIds.value.length}`;
+});
 
 function matchesFilters(expense: Expense): boolean {
-  return (!userFilter.value || String(expense.user_id) === userFilter.value)
+  return (selectedUserIds.value.length === 0 || selectedUserIds.value.includes(expense.user_id))
     && (!categoryFilter.value || expense.category === categoryFilter.value)
     && (!dateFrom.value || expense.spent_at >= dateFrom.value)
     && (!dateTo.value || expense.spent_at <= dateTo.value);
@@ -46,7 +55,9 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = null;
   try {
-    expenses.value = sortExpenses(await expensesApi.list());
+    const [loadedExpenses, loadedUsers] = await Promise.all([expensesApi.list(), usersApi.list()]);
+    expenses.value = sortExpenses(loadedExpenses);
+    users.value = loadedUsers;
   } catch (error) {
     loadError.value = messageFrom(error);
   } finally {
@@ -55,14 +66,14 @@ async function load(): Promise<void> {
 }
 
 function clearFilters(): void {
-  userFilter.value = '';
+  selectedUserIds.value = [];
   categoryFilter.value = '';
   dateFrom.value = '';
   dateTo.value = '';
 }
 
 function startAdd(): void {
-  if (!isLocked.value) adding.value = true;
+  if (!isLocked.value && users.value.length > 0) adding.value = true;
 }
 
 function startEdit(id: number): void {
@@ -139,7 +150,7 @@ onMounted(() => { void load(); });
     <section class="expenses-panel" aria-labelledby="expenses-title">
       <div class="panel-heading">
         <div class="panel-heading__left">
-          <button class="button button--primary add-button" type="button" :disabled="loading || Boolean(loadError) || isLocked" @click="startAdd">
+          <button class="button button--primary add-button" type="button" :disabled="loading || Boolean(loadError) || isLocked || users.length === 0" @click="startAdd">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -161,11 +172,19 @@ onMounted(() => { void load(); });
 
       <div class="filters" aria-label="Фильтры трат">
         <div class="filter-field">
-          <label for="filter-user">Участник семьи</label>
-          <select id="filter-user" v-model="userFilter" class="filter-control" :disabled="isLocked">
-            <option value="">Все участники</option>
-            <option v-for="userId in users" :key="userId" :value="String(userId)">Telegram ID {{ userId }}</option>
-          </select>
+          <span class="filter-label">Участник семьи</span>
+          <details class="multi-select">
+            <summary class="filter-control multi-select__trigger" :aria-disabled="isLocked" :tabindex="isLocked ? -1 : 0" @click="isLocked && $event.preventDefault()">
+              {{ userFilterLabel }}
+            </summary>
+            <div class="multi-select__menu">
+              <label v-for="user in users" :key="user.id" class="multi-select__option">
+                <input v-model="selectedUserIds" type="checkbox" :value="user.id" :disabled="isLocked" />
+                <span>{{ user.alias }}</span>
+              </label>
+              <span v-if="users.length === 0" class="multi-select__empty">Участников пока нет</span>
+            </div>
+          </details>
         </div>
         <div class="filter-field">
           <label for="filter-category">Категория</label>
@@ -185,6 +204,7 @@ onMounted(() => { void load(); });
         <button class="button button--clear" type="button" :disabled="!hasFilters || isLocked" @click="clearFilters">Сбросить</button>
       </div>
       <p v-if="invalidPeriod" class="filter-warning" role="alert">Дата «с» должна быть не позже даты «по».</p>
+      <p v-if="!loading && !loadError && users.length === 0" class="filter-warning">Чтобы добавить трату, сначала добавьте участника на вкладке «Семья».</p>
 
       <div class="table-scroll">
         <table class="expenses-table">
@@ -192,7 +212,7 @@ onMounted(() => { void load(); });
           <thead>
             <tr>
               <th scope="col">ID</th>
-              <th scope="col">Telegram ID</th>
+              <th scope="col">Участник</th>
               <th scope="col">Сумма</th>
               <th scope="col">Категория</th>
               <th scope="col">Дата траты</th>
@@ -209,6 +229,7 @@ onMounted(() => { void load(); });
               :editing="true"
               :saving="savingKey === 'new'"
               :locked="false"
+              :users="users"
               @cancel="adding = false"
               @save="saveNew"
               @invalid="errorMessage = $event"
@@ -233,6 +254,7 @@ onMounted(() => { void load(); });
               :editing="editingId === expense.id"
               :saving="savingKey === expense.id"
               :locked="isLocked"
+              :users="users"
               @edit="startEdit(expense.id)"
               @cancel="editingId = null"
               @save="(input) => saveExisting(expense.id, input)"

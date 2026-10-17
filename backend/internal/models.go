@@ -33,3 +33,9 @@ type Expense struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
+
+type User struct {
+	ID             int64  `db:"id" json:"id"`
+	TelegramUserID int64  `db:"telegram_user_id" json:"telegram_user_id"`
+	Alias          string `db:"alias" json:"alias"`
+}

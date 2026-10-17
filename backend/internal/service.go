@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 type ExpenseRepository interface {
@@ -93,6 +94,95 @@ func (s *ExpenseService) Delete(ctx context.Context, id int64) error {
 }
 
 func validateExpenseID(id int64) error {
+	if id <= 0 {
+		return &ValidationError{Code: CodeInvalidID, Field: "id", Reason: "must be a positive integer"}
+	}
+	return nil
+}
+
+type UserRepository interface {
+	CreateUser(context.Context, User) (User, error)
+	ListUsers(context.Context) ([]User, error)
+	GetUser(context.Context, int64) (User, error)
+	UpdateUser(context.Context, User) (User, error)
+	DeleteUser(context.Context, int64) error
+}
+
+type UserService struct {
+	repository UserRepository
+}
+
+func NewUserService(repository UserRepository) *UserService {
+	return &UserService{repository: repository}
+}
+
+func (s *UserService) Create(ctx context.Context, user User) (User, error) {
+	user.Alias = strings.TrimSpace(user.Alias)
+	if err := validateUser(user); err != nil {
+		return User{}, fmt.Errorf("failed to validate user: %w", err)
+	}
+	created, err := s.repository.CreateUser(ctx, user)
+	if err != nil {
+		return User{}, fmt.Errorf("failed to create user: %w", err)
+	}
+	return created, nil
+}
+
+func (s *UserService) List(ctx context.Context) ([]User, error) {
+	users, err := s.repository.ListUsers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+	return users, nil
+}
+
+func (s *UserService) Get(ctx context.Context, id int64) (User, error) {
+	if err := validateUserID(id); err != nil {
+		return User{}, fmt.Errorf("failed to validate user ID: %w", err)
+	}
+	user, err := s.repository.GetUser(ctx, id)
+	if err != nil {
+		return User{}, fmt.Errorf("failed to get user: %w", err)
+	}
+	return user, nil
+}
+
+func (s *UserService) Update(ctx context.Context, user User) (User, error) {
+	if err := validateUserID(user.ID); err != nil {
+		return User{}, fmt.Errorf("failed to validate user ID: %w", err)
+	}
+	user.Alias = strings.TrimSpace(user.Alias)
+	if err := validateUser(user); err != nil {
+		return User{}, fmt.Errorf("failed to validate user: %w", err)
+	}
+	updated, err := s.repository.UpdateUser(ctx, user)
+	if err != nil {
+		return User{}, fmt.Errorf("failed to update user: %w", err)
+	}
+	return updated, nil
+}
+
+func (s *UserService) Delete(ctx context.Context, id int64) error {
+	if err := validateUserID(id); err != nil {
+		return fmt.Errorf("failed to validate user ID: %w", err)
+	}
+	if err := s.repository.DeleteUser(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
+}
+
+func validateUser(user User) error {
+	if user.TelegramUserID <= 0 {
+		return &ValidationError{Code: CodeInvalidUser, Field: "telegram_user_id", Reason: "must be positive"}
+	}
+	if user.Alias == "" {
+		return &ValidationError{Code: CodeInvalidUser, Field: "alias", Reason: "must not be empty"}
+	}
+	return nil
+}
+
+func validateUserID(id int64) error {
 	if id <= 0 {
 		return &ValidationError{Code: CodeInvalidID, Field: "id", Reason: "must be a positive integer"}
 	}

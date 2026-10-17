@@ -96,9 +96,13 @@ func (h *ExpenseHandler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
 }
 
 func expenseID(r *http.Request) (int64, error) {
+	return resourceID(r, "expense")
+}
+
+func resourceID(r *http.Request, resource string) (int64, error) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		return 0, fmt.Errorf("failed to get expense id: %w", &requestError{
+		return 0, fmt.Errorf("failed to get %s id: %w", resource, &requestError{
 			Code: string(internal.CodeInvalidID), Field: "id", Reason: "must be a positive integer", Cause: err,
 		})
 	}

@@ -227,7 +227,8 @@ a:focus-visible {
   background: var(--border);
 }
 
-.expenses-panel {
+.expenses-panel,
+.users-panel {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 17px;
@@ -320,10 +321,76 @@ a:focus-visible {
   min-width: 0;
 }
 
-.filter-field label {
+.filter-field label,
+.filter-label {
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 650;
+}
+
+.multi-select {
+  position: relative;
+}
+
+.multi-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.multi-select__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.multi-select__trigger::after {
+  content: '⌄';
+  color: var(--muted);
+}
+
+.multi-select__trigger[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.multi-select__menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max(100%, 220px);
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.multi-select__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.multi-select__option:hover {
+  background: rgba(120, 174, 255, 0.1);
+}
+
+.multi-select__option input {
+  accent-color: var(--blue);
+}
+
+.multi-select__empty {
+  display: block;
+  padding: 7px;
+  color: var(--muted);
 }
 
 .filter-control,
@@ -362,25 +429,37 @@ a:focus-visible {
   scrollbar-color: #42546b transparent;
 }
 
-.expenses-table {
+.expenses-table,
+.users-table {
   width: 100%;
-  min-width: 1260px;
   border-collapse: collapse;
   text-align: left;
 }
 
-.expenses-table thead {
+.expenses-table {
+  min-width: 1260px;
+}
+
+.users-table {
+  min-width: 650px;
+}
+
+.expenses-table thead,
+.users-table thead {
   background: #121e2c;
 }
 
 .expenses-table th,
-.expenses-table td {
+.expenses-table td,
+.users-table th,
+.users-table td {
   padding: 14px 15px;
   border-bottom: 1px solid var(--border-soft);
   vertical-align: middle;
 }
 
-.expenses-table thead th {
+.expenses-table thead th,
+.users-table thead th {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 750;
@@ -389,16 +468,20 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.expenses-table tbody tr:hover {
+.expenses-table tbody tr:hover,
+.users-table tbody tr:hover {
   background: rgba(126, 169, 220, 0.035);
 }
 
-.expenses-table tbody tr.expense-row--editing {
+.expenses-table tbody tr.expense-row--editing,
+.users-table tbody tr.user-row--editing {
   background: rgba(92, 149, 219, 0.075);
 }
 
 .expenses-table tbody tr:last-child td,
-.expenses-table tbody tr:last-child th {
+.expenses-table tbody tr:last-child th,
+.users-table tbody tr:last-child td,
+.users-table tbody tr:last-child th {
   border-bottom: 0;
 }
 
@@ -409,7 +492,8 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.expense-row--new .cell-id {
+.expense-row--new .cell-id,
+.user-row--new .cell-id {
   color: var(--blue);
   font-weight: 700;
 }
@@ -618,8 +702,17 @@ a:focus-visible {
 
 @media (max-width: 680px) {
   .site-header__inner {
+    flex-wrap: wrap;
     min-height: 64px;
     padding: 0 18px;
+  }
+
+  .site-nav {
+    min-height: 48px;
+  }
+
+  .site-nav__link {
+    padding: 0 9px;
   }
 
   .brand {

@@ -3,12 +3,16 @@ package internal
 import "errors"
 
 var ErrExpenseNotFound = errors.New("expense not found")
+var ErrUserNotFound = errors.New("user not found")
+var ErrTelegramUserIDTaken = errors.New("telegram user id already belongs to another user")
+var ErrUserHasExpenses = errors.New("user has expenses")
 
 type ValidationCode string
 
 const (
 	CodeInvalidID      ValidationCode = "invalid_id"
 	CodeInvalidExpense ValidationCode = "invalid_expense"
+	CodeInvalidUser    ValidationCode = "invalid_user"
 )
 
 type ValidationError struct {

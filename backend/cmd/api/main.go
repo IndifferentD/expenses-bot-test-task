@@ -46,7 +46,11 @@ func main() {
 
 	repository := internal.NewRepository(db)
 	expenseService := internal.NewExpenseService(repository)
-	handlers := api.Handlers{Expenses: api.NewExpenseHandler(expenseService)}
+	userService := internal.NewUserService(repository)
+	handlers := api.Handlers{
+		Expenses: api.NewExpenseHandler(expenseService),
+		Users:    api.NewUserHandler(userService),
+	}
 	server := &http.Server{
 		Addr:              settings.HTTPAddr,
 		Handler:           api.NewRouter(logger, handlers),

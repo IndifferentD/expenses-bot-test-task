@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, reactive, ref, watch } from 'vue';
+import type { User } from '../user/user';
 import {
   categoryLabel,
   categoryOptions,
@@ -16,6 +17,7 @@ const props = defineProps<{
   editing: boolean;
   saving: boolean;
   locked: boolean;
+  users: User[];
 }>();
 
 const emit = defineEmits<{
@@ -53,7 +55,7 @@ function makeDraft(expense: Expense | null): Draft {
 }
 
 const draft = reactive(makeDraft(props.expense));
-const firstField = ref<HTMLInputElement | null>(null);
+const firstField = ref<HTMLSelectElement | null>(null);
 
 watch(() => props.editing, async (editing) => {
   if (editing) {
@@ -72,7 +74,11 @@ function submit(): void {
   const amount = Number(draft.amount);
 
   if (!Number.isSafeInteger(userId) || userId <= 0) {
-    emit('invalid', 'Telegram ID должен быть положительным целым числом.');
+    emit('invalid', 'Выберите участника семьи.');
+    return;
+  }
+  if (!props.users.some((user) => user.id === userId)) {
+    emit('invalid', 'Выбранный участник не найден.');
     return;
   }
   if (!Number.isSafeInteger(amount) || amount <= 0) {
@@ -102,20 +108,18 @@ function submit(): void {
   <tr :class="{ 'expense-row--editing': editing, 'expense-row--new': !expense }" :aria-busy="saving">
     <th scope="row" class="cell-id">{{ expense ? `#${expense.id}` : 'Новая' }}</th>
     <td>
-      <input
+      <select
         v-if="editing"
         ref="firstField"
         v-model="draft.userId"
         class="table-input table-input--user"
-        type="number"
-        min="1"
-        step="1"
-        inputmode="numeric"
-        aria-label="Telegram ID участника"
-        placeholder="Telegram ID"
+        aria-label="Участник семьи"
         :disabled="saving"
-      />
-      <span v-else>{{ expense?.user_id }}</span>
+      >
+        <option value="" disabled>Выберите участника</option>
+        <option v-for="user in users" :key="user.id" :value="String(user.id)">{{ user.alias }}</option>
+      </select>
+      <span v-else>{{ users.find((user) => user.id === expense?.user_id)?.alias ?? '—' }}</span>
     </td>
     <td class="cell-amount">
       <input
@@ -168,19 +172,6 @@ function submit(): void {
       <div class="row-actions">
         <template v-if="editing">
           <button
-            class="icon-button icon-button--cancel"
-            type="button"
-            :aria-label="expense ? `Отменить изменения траты #${expense.id}` : 'Отменить добавление траты'"
-            title="Отменить"
-            :disabled="saving"
-            @click="emit('cancel')"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M5.6 5.6 18.4 18.4" />
-            </svg>
-          </button>
-          <button
             class="icon-button icon-button--save"
             type="button"
             :aria-label="expense ? `Сохранить изменения траты #${expense.id}` : 'Добавить трату'"
@@ -193,6 +184,19 @@ function submit(): void {
             </svg>
             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          <button
+            class="icon-button icon-button--cancel"
+            type="button"
+            :aria-label="expense ? `Отменить изменения траты #${expense.id}` : 'Отменить добавление траты'"
+            title="Отменить"
+            :disabled="saving"
+            @click="emit('cancel')"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M5.6 5.6 18.4 18.4" />
             </svg>
           </button>
         </template>

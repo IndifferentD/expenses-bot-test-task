@@ -10,10 +10,13 @@ import (
 )
 
 const (
-	codeInvalidBody     = "invalid_body"
-	codeInvalidJSON     = "invalid_json"
-	codeExpenseNotFound = "expense_not_found"
-	codeInternalError   = "internal_error"
+	codeInvalidBody         = "invalid_body"
+	codeInvalidJSON         = "invalid_json"
+	codeExpenseNotFound     = "expense_not_found"
+	codeUserNotFound        = "user_not_found"
+	codeTelegramUserIDTaken = "telegram_user_id_taken"
+	codeUserHasExpenses     = "user_has_expenses"
+	codeInternalError       = "internal_error"
 )
 
 type requestError struct {
@@ -76,6 +79,12 @@ func problemFromError(err error) problemDetails {
 		return invalidProblem(string(validationErr.Code), validationErr.Field, validationErr.Reason)
 	case errors.Is(err, internal.ErrExpenseNotFound):
 		return newProblem(http.StatusNotFound, codeExpenseNotFound, internal.ErrExpenseNotFound.Error())
+	case errors.Is(err, internal.ErrUserNotFound):
+		return newProblem(http.StatusNotFound, codeUserNotFound, internal.ErrUserNotFound.Error())
+	case errors.Is(err, internal.ErrTelegramUserIDTaken):
+		return newProblem(http.StatusConflict, codeTelegramUserIDTaken, internal.ErrTelegramUserIDTaken.Error())
+	case errors.Is(err, internal.ErrUserHasExpenses):
+		return newProblem(http.StatusConflict, codeUserHasExpenses, internal.ErrUserHasExpenses.Error())
 	default:
 		return newProblem(http.StatusInternalServerError, codeInternalError, "internal server error")
 	}
