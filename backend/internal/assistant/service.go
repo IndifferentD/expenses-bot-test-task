@@ -36,7 +36,8 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		return "", fmt.Errorf("failed to interpret message: %w", err)
 	}
 	if call == nil {
-		return "Пока я могу добавлять и удалять траты.", nil
+		// TODO: Учитывать текстовый ответ модели: общая фраза скрывает причину отказа или просьбу уточнить запрос.
+		return "Пока я могу только добавлять и удалять траты.", nil
 	}
 	switch call.name {
 	case "add_expense":
