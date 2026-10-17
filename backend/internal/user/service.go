@@ -12,6 +12,7 @@ type UserRepository interface {
 	Create(context.Context, User) (User, error)
 	List(context.Context) ([]User, error)
 	Get(context.Context, int64) (User, error)
+	GetByTelegramID(context.Context, int64) (User, error)
 	Update(context.Context, User) (User, error)
 	Delete(context.Context, int64) error
 }
@@ -51,6 +52,14 @@ func (s *Service) Get(ctx context.Context, id int64) (User, error) {
 	user, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user: %w", err)
+	}
+	return user, nil
+}
+
+func (s *Service) GetByTelegramID(ctx context.Context, telegramID int64) (User, error) {
+	user, err := s.repository.GetByTelegramID(ctx, telegramID)
+	if err != nil {
+		return User{}, fmt.Errorf("failed to get user by Telegram ID: %w", err)
 	}
 	return user, nil
 }

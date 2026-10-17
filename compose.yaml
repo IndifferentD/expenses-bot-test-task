@@ -37,6 +37,19 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  bot:
+    build:
+      context: ./backend
+    command: ["bot"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL}
+      HTTPS_PROXY: ${TELEGRAM_PROXY_URL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   frontend:
     build:
       context: ./frontend

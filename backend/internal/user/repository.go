@@ -57,6 +57,20 @@ func (r *Repository) Get(ctx context.Context, id int64) (User, error) {
 	return user, nil
 }
 
+func (r *Repository) GetByTelegramID(ctx context.Context, telegramID int64) (User, error) {
+	var user User
+	err := r.db.GetContext(ctx, &user, `
+		SELECT id, telegram_user_id, alias
+		FROM users WHERE telegram_user_id = $1`, telegramID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("failed to get user by Telegram ID: %w", err)
+	}
+	return user, nil
+}
+
 func (r *Repository) Update(ctx context.Context, user User) (User, error) {
 	var updated User
 	err := r.db.GetContext(ctx, &updated, `
