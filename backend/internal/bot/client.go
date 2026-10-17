@@ -72,6 +72,19 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) err
 	return nil
 }
 
+func (c *Client) SendRichMessage(ctx context.Context, chatID int64, richHTML string) error {
+	_, err := c.telegramAPI.SendRichMessage(ctx, &telego.SendRichMessageParams{
+		ChatID: telego.ChatID{ID: chatID},
+		RichMessage: telego.InputRichMessage{
+			HTML: richHTML,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send rich Telegram message: %w", err)
+	}
+	return nil
+}
+
 func (c *Client) SendError(ctx context.Context, chatID int64, message string) error {
 	_, err := c.telegramAPI.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:    telego.ChatID{ID: chatID},

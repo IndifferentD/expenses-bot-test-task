@@ -40,7 +40,7 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 	case err != nil:
 		slog.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
 	default:
-		reply, err := h.assistant.ProcessMessage(ctx, member.ID, message.Text, time.Unix(message.Date, 0))
+		replies, err := h.assistant.ProcessMessage(ctx, member.ID, message.Text, time.Unix(message.Date, 0))
 		if err != nil {
 			slog.Error("failed to process Telegram message", "user_id", member.ID, "error", err)
 			if sendErr := h.telegramClient.SendError(ctx, message.Chat.ID, err.Error()); sendErr != nil {
@@ -48,8 +48,25 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 			}
 			return
 		}
-		if err := h.telegramClient.SendMessage(ctx, message.Chat.ID, reply); err != nil {
-			slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", err)
+		for index, reply := range replies {
+			if index > 0 {
+				// Telegram ограничивает частоту отправки сообщений в одном чате.
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				}
+			}
+			var err error
+			if reply.RichHTML != "" {
+				err = h.telegramClient.SendRichMessage(ctx, message.Chat.ID, reply.RichHTML)
+			} else {
+				err = h.telegramClient.SendMessage(ctx, message.Chat.ID, reply.Text)
+			}
+			if err != nil {
+				slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", err)
+				return
+			}
 		}
 	}
 }

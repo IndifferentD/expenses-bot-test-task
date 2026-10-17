@@ -65,8 +65,11 @@ func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Ti
 		"Сегодня %s, часовой пояс %s. Если сообщение содержит описание траты и сумму, но не указывает явно другое действие, считай его просьбой добавить трату. "+
 			"В таком случае сразу вызывай add_expense без запроса подтверждения. "+
 			"Выбирай delete_expense, только если пользователь явно просит удалить трату. "+
-			"Не вызывай инструменты для вопросов, просмотра, изменения или отрицания записи. "+
-			"Не придумывай сумму, дату или ID. Категорию определяй по покупке или услуге, а если она неясна — выбирай other. Относительную дату преобразуй в YYYY-MM-DD. "+
+			"Выбирай list_expenses, когда пользователь просит показать записи, и summarize_expenses, когда спрашивает сумму или число трат. "+
+			"Для списка передавай all=true, если пользователь просит все записи или указывает фильтр без ограничения числа. При запросе последних N передавай all=false и limit=N; иначе all=false и limit=null. "+
+			"Для просмотра и сводки указывай category только если названа категория, comment — если назван конкретный предмет или услуга. "+
+			"Границы запрошенного периода включительны; для текущего периода конец — сегодня, а если период не указан, передавай null. Не вызывай инструменты для изменения, отрицания записи и посторонних вопросов. "+
+			"Не придумывай сумму, конкретную дату траты или ID. Категорию новой траты определяй по покупке или услуге, а если она неясна — выбирай other. Относительные даты и периоды преобразуй в YYYY-MM-DD. "+
 			"В comment укажи только предмет покупки или услугу; если их нельзя определить, передай null. "+
 			"Для удаления извлекай только явно названные признаки траты: comment — короткая дословная часть описания, без перефразирования; "+
 			"category заполняй только если категория названа прямо. Число после # означает ID траты.",
@@ -76,7 +79,7 @@ func (s *Service) selectTool(ctx context.Context, message string, sentAt time.Ti
 		Model:             s.model,
 		Instructions:      openai.String(instructions),
 		Input:             responses.ResponseNewParamsInputUnion{OfString: openai.String(message)},
-		Tools:             []responses.ToolUnionParam{addExpenseTool(), deleteExpenseTool()},
+		Tools:             []responses.ToolUnionParam{addExpenseTool(), deleteExpenseTool(), listExpensesTool(), summarizeExpensesTool()},
 		ParallelToolCalls: openai.Bool(false),
 		Store:             openai.Bool(false),
 	})

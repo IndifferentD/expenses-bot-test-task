@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,11 @@ type Service struct {
 	location *time.Location
 }
 
+type Reply struct {
+	Text     string
+	RichHTML string
+}
+
 func NewService(client openai.Client, model string, expenses *expense.Service, location *time.Location) (*Service, error) {
 	if strings.TrimSpace(model) == "" {
 		return nil, errors.New("OPENAI_MODEL is required")
@@ -29,31 +35,44 @@ func NewService(client openai.Client, model string, expenses *expense.Service, l
 	return &Service{client: client, model: model, expenses: expenses, location: location}, nil
 }
 
-func (s *Service) ProcessMessage(ctx context.Context, userID int64, message string, sentAt time.Time) (string, error) {
+func (s *Service) ProcessMessage(ctx context.Context, userID int64, message string, sentAt time.Time) ([]Reply, error) {
 	sentAt = sentAt.In(s.location)
 	call, err := s.selectTool(ctx, message, sentAt)
 	if err != nil {
-		return "", fmt.Errorf("failed to interpret message: %w", err)
+		return nil, fmt.Errorf("failed to interpret message: %w", err)
 	}
 	if call == nil {
 		// TODO: Учитывать текстовый ответ модели: общая фраза скрывает причину отказа или просьбу уточнить запрос.
-		return "Пока я могу только добавлять и удалять траты.", nil
+		return []Reply{{Text: "Пока я могу только добавлять, просматривать и удалять траты."}}, nil
 	}
+	slog.DebugContext(ctx, "selected assistant tool", "user_id", userID, "tool", call.name, "arguments", call.arguments)
 	switch call.name {
 	case "add_expense":
 		created, err := s.addExpense(ctx, userID, call.arguments, sentAt)
 		if err != nil {
-			return "", fmt.Errorf("failed to execute add_expense: %w", err)
+			return nil, fmt.Errorf("failed to execute add_expense: %w", err)
 		}
-		return expenseReply("✅ Трата добавлена", created), nil
+		return []Reply{{Text: expenseReply("✅ Трата добавлена", created)}}, nil
 	case "delete_expense":
 		reply, err := s.deleteExpense(ctx, userID, call.arguments)
 		if err != nil {
-			return "", fmt.Errorf("failed to execute delete_expense: %w", err)
+			return nil, fmt.Errorf("failed to execute delete_expense: %w", err)
 		}
-		return reply, nil
+		return []Reply{{Text: reply}}, nil
+	case "list_expenses":
+		replies, err := s.listExpenses(ctx, userID, call.arguments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute list_expenses: %w", err)
+		}
+		return replies, nil
+	case "summarize_expenses":
+		reply, err := s.summarizeExpenses(ctx, userID, call.arguments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute summarize_expenses: %w", err)
+		}
+		return []Reply{{Text: reply}}, nil
 	default:
-		return "", fmt.Errorf("failed to execute unknown tool %q", call.name)
+		return nil, fmt.Errorf("failed to execute unknown tool %q", call.name)
 	}
 }
 

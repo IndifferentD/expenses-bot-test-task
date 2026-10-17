@@ -43,3 +43,43 @@ func deleteExpenseTool() responses.ToolUnionParam {
 	tool.OfFunction.Description = openai.String("Удалить трату по указанному ID или признакам из сообщения пользователя.")
 	return tool
 }
+
+func listExpensesTool() responses.ToolUnionParam {
+	properties := viewFilterProperties()
+	properties["limit"] = map[string]any{"type": []string{"integer", "null"}, "description": "Сколько последних трат показать, если число указано; иначе null."}
+	properties["all"] = map[string]any{"type": "boolean", "description": "True, если пользователь просит показать все подходящие траты."}
+	parameters := map[string]any{
+		"type":                 "object",
+		"properties":           properties,
+		"required":             []string{"category", "comment", "date_from", "date_to", "limit", "all"},
+		"additionalProperties": false,
+	}
+	tool := responses.ToolParamOfFunction("list_expenses", parameters, true)
+	tool.OfFunction.Description = openai.String("Показать траты пользователя с фильтром по категории и периоду.")
+	return tool
+}
+
+func summarizeExpensesTool() responses.ToolUnionParam {
+	parameters := map[string]any{
+		"type":                 "object",
+		"properties":           viewFilterProperties(),
+		"required":             []string{"category", "comment", "date_from", "date_to"},
+		"additionalProperties": false,
+	}
+	tool := responses.ToolParamOfFunction("summarize_expenses", parameters, true)
+	tool.OfFunction.Description = openai.String("Посчитать сумму и количество трат пользователя за период или по категории.")
+	return tool
+}
+
+func viewFilterProperties() map[string]any {
+	return map[string]any{
+		"category": map[string]any{
+			"type":        []string{"string", "null"},
+			"enum":        []any{"food", "transport", "housing", "entertainment", "health", "shopping", "other", nil},
+			"description": "Категория из запроса пользователя, иначе null.",
+		},
+		"comment":   map[string]any{"type": []string{"string", "null"}, "description": "Предмет покупки или услуга из запроса, иначе null."},
+		"date_from": map[string]any{"type": []string{"string", "null"}, "description": "Начало периода YYYY-MM-DD включительно, иначе null."},
+		"date_to":   map[string]any{"type": []string{"string", "null"}, "description": "Конец периода YYYY-MM-DD включительно, иначе null."},
+	}
+}
