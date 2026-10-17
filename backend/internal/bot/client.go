@@ -13,14 +13,12 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-type Runner struct {
-	telegram *telego.Bot
-	handler  *UpdateHandler
-	logger   *slog.Logger
+type Client struct {
+	telegramAPI *telego.Bot
 }
 
-func New(token, proxyAddress string, handler *UpdateHandler, logger *slog.Logger) (*Runner, error) {
-	client := &http.Client{Timeout: 35 * time.Second}
+func NewClient(token, proxyAddress string) (*Client, error) {
+	httpClient := &http.Client{Timeout: 35 * time.Second}
 	if proxyAddress != "" {
 		proxyURL, err := url.Parse(proxyAddress)
 		if err != nil {
@@ -36,35 +34,31 @@ func New(token, proxyAddress string, handler *UpdateHandler, logger *slog.Logger
 		}
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.Proxy = http.ProxyURL(proxyURL)
-		client.Transport = transport
+		httpClient.Transport = transport
 	}
-	telegram, err := telego.NewBot(token,
-		telego.WithHTTPClient(client),
+	telegramAPI, err := telego.NewBot(token,
+		telego.WithHTTPClient(httpClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure Telegram bot: %w", err)
 	}
-	return &Runner{telegram: telegram, handler: handler, logger: logger}, nil
+	return &Client{telegramAPI: telegramAPI}, nil
 }
 
-func (r *Runner) Run(ctx context.Context) error {
-	me, err := r.telegram.GetMe(ctx)
+func (c *Client) Updates(ctx context.Context) (<-chan telego.Update, error) {
+	me, err := c.telegramAPI.GetMe(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Telegram bot API: %w", redactedError{cause: err, token: r.telegram.Token()})
+		return nil, fmt.Errorf("failed to connect to Telegram bot API: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
 	}
-	updates, err := r.telegram.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{
+	updates, err := c.telegramAPI.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{
 		Timeout:        30,
 		AllowedUpdates: []string{telego.MessageUpdates},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start Telegram polling: %w", redactedError{cause: err, token: r.telegram.Token()})
+		return nil, fmt.Errorf("failed to start Telegram polling: %w", redactedError{cause: err, token: c.telegramAPI.Token()})
 	}
-	r.logger.Info("starting Telegram bot", "username", me.Username)
-	for update := range updates {
-		r.handler.Handle(ctx, update)
-	}
-	r.logger.Info("stopped Telegram bot")
-	return nil
+	slog.Info("starting Telegram bot", "username", me.Username)
+	return updates, nil
 }
 
 type redactedError struct {

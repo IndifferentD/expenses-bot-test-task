@@ -11,12 +11,17 @@ import (
 )
 
 type UpdateHandler struct {
-	users  *user.Service
-	logger *slog.Logger
+	users *user.Service
 }
 
-func NewUpdateHandler(users *user.Service, logger *slog.Logger) *UpdateHandler {
-	return &UpdateHandler{users: users, logger: logger}
+func NewUpdateHandler(users *user.Service) *UpdateHandler {
+	return &UpdateHandler{users: users}
+}
+
+func (h *UpdateHandler) Run(ctx context.Context, updates <-chan telego.Update) {
+	for update := range updates {
+		h.Handle(ctx, update)
+	}
 }
 
 func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
@@ -27,10 +32,10 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 	member, err := h.users.GetByTelegramID(ctx, message.From.ID)
 	switch {
 	case errors.Is(err, user.ErrNotFound):
-		h.logger.Info("ignored message from unknown Telegram user", "telegram_user_id", message.From.ID)
+		slog.Info("ignored message from unknown Telegram user", "telegram_user_id", message.From.ID)
 	case err != nil:
-		h.logger.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
+		slog.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
 	default:
-		h.logger.Info("received Telegram message", "user_id", member.ID, "telegram_user_id", member.TelegramUserID, "text", message.Text)
+		slog.Info("received Telegram message", "user_id", member.ID, "telegram_user_id", member.TelegramUserID, "text", message.Text)
 	}
 }
