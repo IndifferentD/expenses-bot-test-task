@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, reactive, ref, watch } from 'vue';
 import type { User } from '../user/user';
+import CategoryIcon from './CategoryIcon.vue';
 import {
   categoryLabel,
   categoryOptions,
@@ -137,11 +138,17 @@ function submit(): void {
       <strong v-else-if="expense">{{ formatAmount(expense.amount) }}</strong>
     </td>
     <td>
-      <select v-if="editing" v-model="draft.category" class="table-input table-select" aria-label="Категория траты" :disabled="saving">
-        <option value="" disabled>Выберите категорию</option>
-        <option v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
-      <span v-else-if="expense" class="category-pill">{{ categoryLabel(expense.category) }}</span>
+      <div v-if="editing" class="category-select">
+        <CategoryIcon v-if="draft.category" :category="draft.category" />
+        <select v-model="draft.category" class="table-input table-select" aria-label="Категория траты" :disabled="saving">
+          <option value="" disabled>Выберите категорию</option>
+          <option v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </div>
+      <span v-else-if="expense" class="category-pill">
+        <CategoryIcon :category="expense.category" />
+        <span class="category-text">{{ categoryLabel(expense.category) }}</span>
+      </span>
     </td>
     <td>
       <input

@@ -385,6 +385,34 @@ a:focus-visible {
   color: var(--muted);
 }
 
+.category-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.category-choice .category-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-icon {
+  display: block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.category-icon--food { color: #f3b56b; }
+.category-icon--transport { color: #77baff; }
+.category-icon--housing { color: #69d2bf; }
+.category-icon--entertainment { color: #c6a0ff; }
+.category-icon--health { color: #ff8fa7; }
+.category-icon--shopping { color: #b4dd78; }
+.category-icon--other { color: #b0bed0; }
+
 .filter-control,
 .table-input {
   width: 100%;
@@ -517,17 +545,40 @@ a:focus-visible {
 }
 
 .category-pill {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   max-width: 220px;
   padding: 5px 9px;
-  overflow: hidden;
-  border: 1px solid rgba(120, 174, 255, 0.16);
+  border: 1px solid rgba(174, 190, 212, 0.18);
   border-radius: 6px;
-  background: rgba(120, 174, 255, 0.1);
-  color: #acd0ff;
+  background: rgba(174, 190, 212, 0.07);
+  color: var(--text);
   font-size: 0.78rem;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.category-pill .category-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-select {
+  position: relative;
+  min-width: 190px;
+}
+
+.category-select .category-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 11px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.category-select .table-select {
+  padding-left: 36px;
 }
 
 .table-input--user {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { expensesApi, type ExpenseFilters } from '../../entities/expense/expensesApi';
+import CategoryIcon from '../../entities/expense/CategoryIcon.vue';
 import ExpenseRow from '../../entities/expense/ExpenseRow.vue';
 import { categoryOptions, formatAmount, type Category, type Expense, type ExpenseInput } from '../../entities/expense/expense';
 import { usersApi } from '../../entities/user/usersApi';
@@ -45,6 +46,7 @@ const categoryFilterLabel = computed(() => {
   }
   return `Выбрано: ${selectedCategories.value.length}`;
 });
+const selectedCategory = computed(() => selectedCategories.value.length === 1 ? selectedCategories.value[0] : null);
 
 function matchesFilters(expense: Expense): boolean {
   return (selectedUserIds.value.length === 0 || selectedUserIds.value.includes(expense.user_id))
@@ -251,12 +253,19 @@ onMounted(() => { void load(); });
           <span class="filter-label">Категория</span>
           <details class="multi-select">
             <summary class="filter-control multi-select__trigger" :aria-disabled="isLocked" :tabindex="isLocked ? -1 : 0" @click="isLocked && $event.preventDefault()">
-              {{ categoryFilterLabel }}
+              <span v-if="selectedCategory" class="category-choice">
+                <CategoryIcon :category="selectedCategory" />
+                <span class="category-text">{{ categoryFilterLabel }}</span>
+              </span>
+              <span v-else>{{ categoryFilterLabel }}</span>
             </summary>
             <div class="multi-select__menu">
               <label v-for="option in categoryOptions" :key="option.value" class="multi-select__option">
                 <input v-model="selectedCategories" type="checkbox" :value="option.value" :disabled="isLocked" />
-                <span>{{ option.label }}</span>
+                <span class="category-choice">
+                  <CategoryIcon :category="option.value" />
+                  <span>{{ option.label }}</span>
+                </span>
               </label>
             </div>
           </details>
