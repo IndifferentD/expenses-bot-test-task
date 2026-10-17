@@ -40,6 +40,11 @@ type Expense struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
+type Summary struct {
+	Count int64 `db:"count"`
+	Total int64 `db:"total"`
+}
+
 var ErrInvalidDate = errors.New("invalid date")
 
 // Date хранит календарный день без времени и часового пояса.

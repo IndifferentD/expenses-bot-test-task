@@ -142,6 +142,11 @@ func queryLimit(values url.Values) (int, error) {
 			Code: string(internal.CodeInvalidFilter), Field: "limit", Reason: "must be an integer between 1 and 100", Cause: err,
 		})
 	}
+	if limit < 1 || limit > 100 {
+		return 0, fmt.Errorf("failed to parse limit filter: %w", &requestError{
+			Code: string(internal.CodeInvalidFilter), Field: "limit", Reason: "must be an integer between 1 and 100",
+		})
+	}
 	return limit, nil
 }
 

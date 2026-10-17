@@ -10,21 +10,27 @@ import (
 type ExpenseRepository interface {
 	Create(context.Context, Expense) (Expense, error)
 	List(context.Context, ListFilter) ([]Expense, error)
+	ListFiltered(context.Context, Filter, int) ([]Expense, error)
+	Summarize(context.Context, Filter) (Summary, error)
 	Get(context.Context, int64) (Expense, error)
 	Update(context.Context, Expense) (Expense, error)
 	Delete(context.Context, int64) error
 	DeleteForUser(context.Context, int64, int64) (Expense, error)
 }
 
-type ListFilter struct {
+type Filter struct {
 	UserIDs    []int64
 	Categories []Category
 	DateFrom   Date
 	DateTo     Date
 	Amount     int64
 	Comment    string
-	Limit      int
-	Cursor     *ListCursor
+}
+
+type ListFilter struct {
+	Filter
+	Limit  int
+	Cursor *ListCursor
 }
 
 type ListCursor struct {
@@ -90,13 +96,45 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListPage, error)
 	return page, nil
 }
 
+// ListFiltered возвращает все подходящие траты, если limit равен нулю.
+func (s *Service) ListFiltered(ctx context.Context, filter Filter, limit int) ([]Expense, error) {
+	if err := validateFilter(filter); err != nil {
+		return nil, fmt.Errorf("failed to validate expense filter: %w", err)
+	}
+	if limit < 0 {
+		return nil, fmt.Errorf("failed to validate expense limit: %w", &internal.ValidationError{
+			Code: internal.CodeInvalidFilter, Field: "limit", Reason: "must not be negative",
+		})
+	}
+	expenses, err := s.repository.ListFiltered(ctx, filter, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list filtered expenses: %w", err)
+	}
+	return expenses, nil
+}
+
 func validateListFilter(filter ListFilter) error {
-	if filter.Limit < 1 || filter.Limit > 100 {
-		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "limit", Reason: "must be between 1 and 100"}
+	if filter.Limit < 1 {
+		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "limit", Reason: "must be positive"}
 	}
 	if filter.Cursor != nil && (filter.Cursor.ID <= 0 || filter.Cursor.SpentAt.IsZero()) {
 		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "cursor", Reason: "must contain a date and positive expense ID"}
 	}
+	return validateFilter(filter.Filter)
+}
+
+func (s *Service) Summarize(ctx context.Context, filter Filter) (Summary, error) {
+	if err := validateFilter(filter); err != nil {
+		return Summary{}, fmt.Errorf("failed to validate expense filter: %w", err)
+	}
+	result, err := s.repository.Summarize(ctx, filter)
+	if err != nil {
+		return Summary{}, fmt.Errorf("failed to summarize expenses: %w", err)
+	}
+	return result, nil
+}
+
+func validateFilter(filter Filter) error {
 	if filter.Amount < 0 {
 		return &internal.ValidationError{Code: internal.CodeInvalidFilter, Field: "amount", Reason: "must not be negative"}
 	}

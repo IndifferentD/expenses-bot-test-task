@@ -31,7 +31,7 @@ func (s *Service) deleteExpense(ctx context.Context, userID int64, arguments str
 		return s.deleteOwnedExpense(ctx, userID, *input.ID)
 	}
 
-	filter := expense.ListFilter{UserIDs: []int64{userID}, Limit: 5}
+	filter := expense.ListFilter{Filter: expense.Filter{UserIDs: []int64{userID}}, Limit: 5}
 	if input.Amount != nil {
 		if *input.Amount <= 0 {
 			return "", errors.New("failed to validate deletion details: amount must be positive")

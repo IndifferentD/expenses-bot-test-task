@@ -39,11 +39,57 @@ func (r *Repository) Create(ctx context.Context, expense Expense) (Expense, erro
 }
 
 func (r *Repository) List(ctx context.Context, filter ListFilter) ([]Expense, error) {
+	return r.listFiltered(ctx, filter.Filter, filter.Cursor, filter.Limit+1)
+}
+
+func (r *Repository) ListFiltered(ctx context.Context, filter Filter, limit int) ([]Expense, error) {
+	return r.listFiltered(ctx, filter, nil, limit)
+}
+
+func (r *Repository) listFiltered(ctx context.Context, filter Filter, cursor *ListCursor, limit int) ([]Expense, error) {
 	expenses := make([]Expense, 0)
 	query := `
 		SELECT id, user_id, amount, category, spent_at,
 			comment, created_at, updated_at
-		FROM expenses WHERE 1 = 1`
+		FROM expenses`
+	where, args := expenseWhere(filter)
+	query += where
+	if cursor != nil {
+		query += " AND (spent_at, id) < (?, ?)"
+		args = append(args, cursor.SpentAt, cursor.ID)
+	}
+	query += " ORDER BY spent_at DESC, id DESC"
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+	query, args, err := sqlx.In(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build expense filter query: %w", err)
+	}
+	if err := r.db.SelectContext(ctx, &expenses, r.db.Rebind(query), args...); err != nil {
+		return nil, fmt.Errorf("failed to list expenses: %w", err)
+	}
+	return expenses, nil
+}
+
+func (r *Repository) Summarize(ctx context.Context, filter Filter) (Summary, error) {
+	query := "SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total FROM expenses"
+	where, args := expenseWhere(filter)
+	query += where
+	query, args, err := sqlx.In(query, args...)
+	if err != nil {
+		return Summary{}, fmt.Errorf("failed to build expense summary query: %w", err)
+	}
+	var result Summary
+	if err := r.db.GetContext(ctx, &result, r.db.Rebind(query), args...); err != nil {
+		return Summary{}, fmt.Errorf("failed to summarize expenses: %w", err)
+	}
+	return result, nil
+}
+
+func expenseWhere(filter Filter) (string, []any) {
+	query := " WHERE 1 = 1"
 	args := make([]any, 0, 9)
 	if len(filter.UserIDs) > 0 {
 		query += " AND user_id IN (?)"
@@ -69,20 +115,7 @@ func (r *Repository) List(ctx context.Context, filter ListFilter) ([]Expense, er
 		query += " AND strpos(lower(coalesce(comment, '')), lower(?)) > 0"
 		args = append(args, filter.Comment)
 	}
-	if filter.Cursor != nil {
-		query += " AND (spent_at, id) < (?, ?)"
-		args = append(args, filter.Cursor.SpentAt, filter.Cursor.ID)
-	}
-	query += " ORDER BY spent_at DESC, id DESC LIMIT ?"
-	args = append(args, filter.Limit+1)
-	query, args, err := sqlx.In(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build expense filter query: %w", err)
-	}
-	if err := r.db.SelectContext(ctx, &expenses, r.db.Rebind(query), args...); err != nil {
-		return nil, fmt.Errorf("failed to list expenses: %w", err)
-	}
-	return expenses, nil
+	return query, args
 }
 
 func (r *Repository) Get(ctx context.Context, id int64) (Expense, error) {
