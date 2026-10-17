@@ -9,15 +9,16 @@ import (
 	"strconv"
 
 	"expenses-bot/backend/internal"
+	"expenses-bot/backend/internal/expense"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type ExpenseHandler struct {
-	service *internal.ExpenseService
+	service *expense.Service
 }
 
-func NewExpenseHandler(service *internal.ExpenseService) *ExpenseHandler {
+func NewExpenseHandler(service *expense.Service) *ExpenseHandler {
 	return &ExpenseHandler{service: service}
 }
 
@@ -43,7 +44,7 @@ func (h *ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
-		Items []internal.Expense `json:"items"`
+		Items []expense.Expense `json:"items"`
 	}{Items: expenses})
 }
 
@@ -109,23 +110,23 @@ func resourceID(r *http.Request, resource string) (int64, error) {
 	return id, nil
 }
 
-func readExpense(r *http.Request) (internal.Expense, error) {
+func readExpense(r *http.Request) (expense.Expense, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return internal.Expense{}, fmt.Errorf("failed to read expense request: %w", &requestError{
+		return expense.Expense{}, fmt.Errorf("failed to read expense request: %w", &requestError{
 			Code: codeInvalidBody, Reason: "failed to read request body", Cause: err,
 		})
 	}
-	var expense internal.Expense
-	if err := json.Unmarshal(body, &expense); err != nil {
-		if errors.Is(err, internal.ErrInvalidDate) {
-			return internal.Expense{}, fmt.Errorf("failed to decode expense date: %w", &requestError{
+	var value expense.Expense
+	if err := json.Unmarshal(body, &value); err != nil {
+		if errors.Is(err, expense.ErrInvalidDate) {
+			return expense.Expense{}, fmt.Errorf("failed to decode expense date: %w", &requestError{
 				Code: string(internal.CodeInvalidExpense), Field: "spent_at", Reason: "must be YYYY-MM-DD", Cause: err,
 			})
 		}
-		return internal.Expense{}, fmt.Errorf("failed to decode expense request: %w", &requestError{
+		return expense.Expense{}, fmt.Errorf("failed to decode expense request: %w", &requestError{
 			Code: codeInvalidJSON, Reason: "invalid JSON request", Cause: err,
 		})
 	}
-	return expense, nil
+	return value, nil
 }

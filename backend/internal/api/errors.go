@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"expenses-bot/backend/internal"
+	"expenses-bot/backend/internal/expense"
+	"expenses-bot/backend/internal/user"
 )
 
 const (
@@ -77,14 +79,14 @@ func problemFromError(err error) problemDetails {
 		return invalidProblem(requestErr.Code, requestErr.Field, requestErr.Reason)
 	case errors.As(err, &validationErr):
 		return invalidProblem(string(validationErr.Code), validationErr.Field, validationErr.Reason)
-	case errors.Is(err, internal.ErrExpenseNotFound):
-		return newProblem(http.StatusNotFound, codeExpenseNotFound, internal.ErrExpenseNotFound.Error())
-	case errors.Is(err, internal.ErrUserNotFound):
-		return newProblem(http.StatusNotFound, codeUserNotFound, internal.ErrUserNotFound.Error())
-	case errors.Is(err, internal.ErrTelegramUserIDTaken):
-		return newProblem(http.StatusConflict, codeTelegramUserIDTaken, internal.ErrTelegramUserIDTaken.Error())
-	case errors.Is(err, internal.ErrUserHasExpenses):
-		return newProblem(http.StatusConflict, codeUserHasExpenses, internal.ErrUserHasExpenses.Error())
+	case errors.Is(err, expense.ErrNotFound):
+		return newProblem(http.StatusNotFound, codeExpenseNotFound, expense.ErrNotFound.Error())
+	case errors.Is(err, user.ErrNotFound):
+		return newProblem(http.StatusNotFound, codeUserNotFound, user.ErrNotFound.Error())
+	case errors.Is(err, user.ErrTelegramUserIDTaken):
+		return newProblem(http.StatusConflict, codeTelegramUserIDTaken, user.ErrTelegramUserIDTaken.Error())
+	case errors.Is(err, user.ErrHasExpenses):
+		return newProblem(http.StatusConflict, codeUserHasExpenses, user.ErrHasExpenses.Error())
 	default:
 		return newProblem(http.StatusInternalServerError, codeInternalError, "internal server error")
 	}

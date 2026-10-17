@@ -13,6 +13,9 @@ import (
 
 	"expenses-bot/backend/internal"
 	"expenses-bot/backend/internal/api"
+	"expenses-bot/backend/internal/db"
+	"expenses-bot/backend/internal/expense"
+	"expenses-bot/backend/internal/user"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -37,16 +40,15 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	db, err := internal.ConnectPostgres(ctx, settings.DatabaseURL)
+	database, err := db.ConnectPostgres(ctx, settings.DatabaseURL)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer database.Close()
 
-	repository := internal.NewRepository(db)
-	expenseService := internal.NewExpenseService(repository)
-	userService := internal.NewUserService(repository)
+	expenseService := expense.NewService(expense.NewRepository(database))
+	userService := user.NewService(user.NewRepository(database))
 	handlers := api.Handlers{
 		Expenses: api.NewExpenseHandler(expenseService),
 		Users:    api.NewUserHandler(userService),

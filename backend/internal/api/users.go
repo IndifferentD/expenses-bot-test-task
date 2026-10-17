@@ -6,14 +6,14 @@ import (
 	"io"
 	"net/http"
 
-	"expenses-bot/backend/internal"
+	"expenses-bot/backend/internal/user"
 )
 
 type UserHandler struct {
-	service *internal.UserService
+	service *user.Service
 }
 
-func NewUserHandler(service *internal.UserService) *UserHandler {
+func NewUserHandler(service *user.Service) *UserHandler {
 	return &UserHandler{service: service}
 }
 
@@ -38,7 +38,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
-		Items []internal.User `json:"items"`
+		Items []user.User `json:"items"`
 	}{Items: users})
 }
 
@@ -89,18 +89,18 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func readUser(r *http.Request) (internal.User, error) {
+func readUser(r *http.Request) (user.User, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return internal.User{}, fmt.Errorf("failed to read user request: %w", &requestError{
+		return user.User{}, fmt.Errorf("failed to read user request: %w", &requestError{
 			Code: codeInvalidBody, Reason: "failed to read request body", Cause: err,
 		})
 	}
-	var user internal.User
-	if err := json.Unmarshal(body, &user); err != nil {
-		return internal.User{}, fmt.Errorf("failed to decode user request: %w", &requestError{
+	var value user.User
+	if err := json.Unmarshal(body, &value); err != nil {
+		return user.User{}, fmt.Errorf("failed to decode user request: %w", &requestError{
 			Code: codeInvalidJSON, Reason: "invalid JSON request", Cause: err,
 		})
 	}
-	return user, nil
+	return value, nil
 }
