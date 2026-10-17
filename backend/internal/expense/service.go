@@ -13,7 +13,10 @@ type ExpenseRepository interface {
 	ListFiltered(context.Context, Filter, int) ([]Expense, error)
 	Summarize(context.Context, Filter) (Summary, error)
 	Get(context.Context, int64) (Expense, error)
+	GetForUser(context.Context, int64, int64) (Expense, error)
+	GetLatestForUser(context.Context, int64) (Expense, error)
 	Update(context.Context, Expense) (Expense, error)
+	UpdateForUser(context.Context, int64, int64, ExpenseChanges) (Expense, error)
 	Delete(context.Context, int64) error
 	DeleteForUser(context.Context, int64, int64) (Expense, error)
 }
@@ -165,6 +168,31 @@ func (s *Service) Get(ctx context.Context, id int64) (Expense, error) {
 	return expense, nil
 }
 
+func (s *Service) GetForUser(ctx context.Context, id, userID int64) (Expense, error) {
+	if err := validateExpenseID(id); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense ID: %w", err)
+	}
+	if err := validateUserID(userID); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense owner: %w", err)
+	}
+	expense, err := s.repository.GetForUser(ctx, id, userID)
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to get user expense: %w", err)
+	}
+	return expense, nil
+}
+
+func (s *Service) GetLatestForUser(ctx context.Context, userID int64) (Expense, error) {
+	if err := validateUserID(userID); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense owner: %w", err)
+	}
+	expense, err := s.repository.GetLatestForUser(ctx, userID)
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to get latest user expense: %w", err)
+	}
+	return expense, nil
+}
+
 func (s *Service) Update(ctx context.Context, expense Expense) (Expense, error) {
 	if err := validateExpenseID(expense.ID); err != nil {
 		return Expense{}, fmt.Errorf("failed to validate expense: %w", err)
@@ -177,6 +205,39 @@ func (s *Service) Update(ctx context.Context, expense Expense) (Expense, error) 
 		return Expense{}, fmt.Errorf("failed to update expense: %w", err)
 	}
 	return updated, nil
+}
+
+func (s *Service) UpdateForUser(ctx context.Context, id, userID int64, changes ExpenseChanges) (Expense, error) {
+	if err := validateExpenseID(id); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense ID: %w", err)
+	}
+	if err := validateUserID(userID); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense owner: %w", err)
+	}
+	if err := validateExpenseChanges(changes); err != nil {
+		return Expense{}, fmt.Errorf("failed to validate expense changes: %w", err)
+	}
+	updated, err := s.repository.UpdateForUser(ctx, id, userID, changes)
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to update user expense: %w", err)
+	}
+	return updated, nil
+}
+
+func validateExpenseChanges(changes ExpenseChanges) error {
+	if changes.Amount == nil && changes.Category == nil && changes.SpentAt == nil && changes.Comment == nil {
+		return &internal.ValidationError{Code: internal.CodeInvalidExpense, Reason: "must change at least one field"}
+	}
+	if changes.Amount != nil && *changes.Amount <= 0 {
+		return &internal.ValidationError{Code: internal.CodeInvalidExpense, Field: "amount", Reason: "must be positive"}
+	}
+	if changes.Category != nil && !changes.Category.Valid() {
+		return &internal.ValidationError{Code: internal.CodeInvalidExpense, Field: "category", Reason: "must be a valid category"}
+	}
+	if changes.SpentAt != nil && changes.SpentAt.IsZero() {
+		return &internal.ValidationError{Code: internal.CodeInvalidExpense, Field: "spent_at", Reason: "must be YYYY-MM-DD"}
+	}
+	return nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
@@ -201,6 +262,13 @@ func (s *Service) DeleteForUser(ctx context.Context, id, userID int64) (Expense,
 		return Expense{}, fmt.Errorf("failed to delete user expense: %w", err)
 	}
 	return deleted, nil
+}
+
+func validateUserID(userID int64) error {
+	if userID <= 0 {
+		return &internal.ValidationError{Code: internal.CodeInvalidID, Field: "user_id", Reason: "must be a positive integer"}
+	}
+	return nil
 }
 
 func validateExpenseID(id int64) error {

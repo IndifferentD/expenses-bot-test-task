@@ -69,7 +69,7 @@ func (s *Service) deleteExpense(ctx context.Context, userID int64, arguments str
 	if len(page.Items) == 1 && page.NextCursor == nil {
 		return s.deleteOwnedExpense(ctx, userID, page.Items[0].ID)
 	}
-	return deletionChoices(page), nil
+	return expenseChoices(page, "Для удаления отправьте новое сообщение с номером нужной траты: «удали #номер»."), nil
 }
 
 func (s *Service) deleteOwnedExpense(ctx context.Context, userID, id int64) (string, error) {
@@ -84,26 +84,32 @@ func (s *Service) deleteOwnedExpense(ctx context.Context, userID, id int64) (str
 	return expenseReply("🗑 Трата удалена", deleted), nil
 }
 
-func deletionChoices(page expense.ListPage) string {
+func expenseChoices(page expense.ListPage, instruction string) string {
 	var reply strings.Builder
 	reply.WriteString("Нашёл несколько трат:\n\n")
 	for _, item := range page.Items {
-		comment := "—"
-		if item.Comment != nil {
-			comment = strings.Join(strings.Fields(*item.Comment), " ")
-			if comment == "" {
-				comment = "—"
-			}
-		}
-		runes := []rune(comment)
-		if len(runes) > 60 {
-			comment = string(runes[:60]) + "…"
-		}
-		fmt.Fprintf(&reply, "#%d · %s ₽ · %s · %s · %s\n", item.ID, formatAmount(item.Amount), categoryName(item.Category), comment, item.SpentAt.Format("02.01.2006"))
+		reply.WriteString(expenseChoiceLine(item))
+		reply.WriteByte('\n')
 	}
 	if page.NextCursor != nil {
 		reply.WriteString("\nПоказаны первые пять совпадений.\n")
 	}
-	reply.WriteString("\nДля удаления отправьте новое сообщение с номером нужной траты: «удали #номер».")
+	reply.WriteString("\n")
+	reply.WriteString(instruction)
 	return reply.String()
+}
+
+func expenseChoiceLine(item expense.Expense) string {
+	comment := "—"
+	if item.Comment != nil {
+		comment = strings.Join(strings.Fields(*item.Comment), " ")
+		if comment == "" {
+			comment = "—"
+		}
+	}
+	runes := []rune(comment)
+	if len(runes) > 60 {
+		comment = string(runes[:60]) + "…"
+	}
+	return fmt.Sprintf("#%d · %s ₽ · %s · %s · %s", item.ID, formatAmount(item.Amount), categoryName(item.Category), comment, item.SpentAt.Format("02.01.2006"))
 }

@@ -40,6 +40,14 @@ type Expense struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
+// ExpenseChanges: nil не меняет поле; пустой Comment очищает его.
+type ExpenseChanges struct {
+	Amount   *int64
+	Category *Category
+	SpentAt  *Date
+	Comment  *string
+}
+
 type Summary struct {
 	Count int64 `db:"count"`
 	Total int64 `db:"total"`

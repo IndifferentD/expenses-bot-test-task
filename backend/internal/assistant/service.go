@@ -43,7 +43,7 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 	}
 	if call == nil {
 		// TODO: Учитывать текстовый ответ модели: общая фраза скрывает причину отказа или просьбу уточнить запрос.
-		return []Reply{{Text: "Пока я могу только добавлять, просматривать и удалять траты."}}, nil
+		return []Reply{{Text: "Я могу только добавлять, просматривать, изменять и удалять траты. Пожалуйста, уточните запрос."}}, nil
 	}
 	slog.DebugContext(ctx, "selected assistant tool", "user_id", userID, "tool", call.name, "arguments", call.arguments)
 	switch call.name {
@@ -59,6 +59,12 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 			return nil, fmt.Errorf("failed to execute delete_expense: %w", err)
 		}
 		return []Reply{{Text: reply}}, nil
+	case "edit_expense":
+		reply, err := s.editExpense(ctx, userID, call.arguments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute edit_expense: %w", err)
+		}
+		return []Reply{reply}, nil
 	case "list_expenses":
 		replies, err := s.listExpenses(ctx, userID, call.arguments)
 		if err != nil {

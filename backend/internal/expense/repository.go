@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"expenses-bot/backend/internal/user"
 
@@ -133,6 +134,37 @@ func (r *Repository) Get(ctx context.Context, id int64) (Expense, error) {
 	return expense, nil
 }
 
+func (r *Repository) GetForUser(ctx context.Context, id, userID int64) (Expense, error) {
+	var expense Expense
+	err := r.db.GetContext(ctx, &expense, `
+		SELECT id, user_id, amount, category, spent_at,
+			comment, created_at, updated_at
+		FROM expenses WHERE id = $1 AND user_id = $2`, id, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Expense{}, ErrNotFound
+	}
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to get user expense: %w", err)
+	}
+	return expense, nil
+}
+
+func (r *Repository) GetLatestForUser(ctx context.Context, userID int64) (Expense, error) {
+	var expense Expense
+	err := r.db.GetContext(ctx, &expense, `
+		SELECT id, user_id, amount, category, spent_at,
+			comment, created_at, updated_at
+		FROM expenses WHERE user_id = $1
+		ORDER BY created_at DESC, id DESC LIMIT 1`, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Expense{}, ErrNotFound
+	}
+	if err != nil {
+		return Expense{}, fmt.Errorf("failed to get latest user expense: %w", err)
+	}
+	return expense, nil
+}
+
 func (r *Repository) Update(ctx context.Context, expense Expense) (Expense, error) {
 	var updated Expense
 	err := r.db.GetContext(ctx, &updated, `
@@ -152,6 +184,45 @@ func (r *Repository) Update(ctx context.Context, expense Expense) (Expense, erro
 			return Expense{}, user.ErrNotFound
 		}
 		return Expense{}, fmt.Errorf("failed to update expense: %w", err)
+	}
+	return updated, nil
+}
+
+func (r *Repository) UpdateForUser(ctx context.Context, id, userID int64, changes ExpenseChanges) (Expense, error) {
+	set := []string{"updated_at = now()"}
+	args := make([]any, 0, 6)
+	if changes.Amount != nil {
+		args = append(args, *changes.Amount)
+		set = append(set, fmt.Sprintf("amount = $%d", len(args)))
+	}
+	if changes.Category != nil {
+		args = append(args, *changes.Category)
+		set = append(set, fmt.Sprintf("category = $%d", len(args)))
+	}
+	if changes.SpentAt != nil {
+		args = append(args, *changes.SpentAt)
+		set = append(set, fmt.Sprintf("spent_at = $%d", len(args)))
+	}
+	if changes.Comment != nil {
+		if *changes.Comment == "" {
+			set = append(set, "comment = NULL")
+		} else {
+			args = append(args, *changes.Comment)
+			set = append(set, fmt.Sprintf("comment = $%d", len(args)))
+		}
+	}
+	args = append(args, id, userID)
+	query := fmt.Sprintf(`
+		UPDATE expenses SET %s
+		WHERE id = $%d AND user_id = $%d
+		RETURNING id, user_id, amount, category, spent_at,
+			comment, created_at, updated_at`, strings.Join(set, ", "), len(args)-1, len(args))
+	var updated Expense
+	if err := r.db.GetContext(ctx, &updated, query, args...); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Expense{}, ErrNotFound
+		}
+		return Expense{}, fmt.Errorf("failed to update user expense: %w", err)
 	}
 	return updated, nil
 }
