@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -27,13 +28,19 @@ type Config struct {
 }
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatalf("API stopped: %v", err)
+	}
+}
+
+func run() error {
 	settings, err := env.ParseAs[Config]()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to load API configuration: %w", err)
 	}
 	logger, err := internal.NewLogger(settings.LogLevel)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to configure API logging: %w", err)
 	}
 	slog.SetDefault(logger)
 
@@ -42,8 +49,7 @@ func main() {
 
 	database, err := db.ConnectPostgres(ctx, settings.DatabaseURL)
 	if err != nil {
-		slog.Error("failed to open database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer database.Close()
 
@@ -70,7 +76,7 @@ func main() {
 
 	slog.Info("starting api", "addr", settings.HTTPAddr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		slog.Error("failed to serve API", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to serve API: %w", err)
 	}
+	return nil
 }

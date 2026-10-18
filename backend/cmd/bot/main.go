@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -34,20 +33,13 @@ type Config struct {
 }
 
 func main() {
-	slog.SetLogLoggerLevel(slog.LevelError)
-	if err := run(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func run() error {
 	settings, err := env.ParseAs[Config]()
 	if err != nil {
-		return fmt.Errorf("failed to load bot configuration: %w", err)
+		log.Fatalf("failed to load bot configuration: %v", err)
 	}
 	logger, err := internal.NewLogger(settings.LogLevel)
 	if err != nil {
-		return fmt.Errorf("failed to configure logging: %w", err)
+		log.Fatalf("failed to configure logging: %v", err)
 	}
 	slog.SetDefault(logger)
 
@@ -56,31 +48,31 @@ func run() error {
 
 	database, err := db.ConnectPostgres(ctx, settings.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		log.Fatalf("failed to open database: %v", err)
 	}
 	defer database.Close()
 
 	location, err := time.LoadLocation(settings.Timezone)
 	if err != nil {
-		return fmt.Errorf("failed to load timezone %q: %w", settings.Timezone, err)
+		log.Fatalf("failed to load timezone %q: %v", settings.Timezone, err)
 	}
 	expenseService := expense.NewService(expense.NewRepository(database))
 	openAIClient, err := assistant.NewOpenAIClient(settings.OpenAIAPIKey, settings.OpenAIBaseURL, settings.OpenAIProxyURL)
 	if err != nil {
-		return fmt.Errorf("failed to initialize OpenAI client: %w", err)
+		log.Fatalf("failed to initialize OpenAI client: %v", err)
 	}
 	assistantService, err := assistant.NewService(openAIClient, settings.OpenAIModel, expenseService, location)
 	if err != nil {
-		return fmt.Errorf("failed to initialize expense assistant: %w", err)
+		log.Fatalf("failed to initialize expense assistant: %v", err)
 	}
 
 	telegramClient, err := bot.NewClient(settings.TelegramBotToken, settings.TelegramProxyURL)
 	if err != nil {
-		return fmt.Errorf("failed to initialize Telegram bot: %w", err)
+		log.Fatalf("failed to initialize Telegram bot: %v", err)
 	}
 	updates, err := telegramClient.StartPolling(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to receive Telegram updates: %w", err)
+		log.Fatalf("failed to receive Telegram updates: %v", err)
 	}
 
 	userService := user.NewService(user.NewRepository(database))
@@ -88,5 +80,4 @@ func run() error {
 	updateHandler.Run(ctx, updates)
 
 	slog.Info("stopped Telegram bot")
-	return nil
 }
