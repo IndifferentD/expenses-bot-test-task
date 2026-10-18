@@ -40,7 +40,7 @@ type Expense struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
-// ExpenseChanges: nil не меняет поле; пустой Comment очищает его.
+// ExpenseChanges содержит только изменяемые поля: nil оставляет поле прежним, пустой Comment очищает его.
 type ExpenseChanges struct {
 	Amount   *int64
 	Category *Category

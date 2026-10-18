@@ -91,7 +91,7 @@ func (r *Repository) Update(ctx context.Context, user User) (User, error) {
 
 func (r *Repository) Delete(ctx context.Context, id int64) error {
 	result, err := r.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, id)
-	if hasConstraint(err, "23001", "expenses_user_id_fkey") {
+	if hasConstraint(err, "23503", "expenses_user_id_fkey") {
 		return ErrHasExpenses
 	}
 	if err != nil {

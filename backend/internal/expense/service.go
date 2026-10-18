@@ -99,7 +99,6 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListPage, error)
 	return page, nil
 }
 
-// ListFiltered возвращает все подходящие траты, если limit равен нулю.
 func (s *Service) ListFiltered(ctx context.Context, filter Filter, limit int) ([]Expense, error) {
 	if err := validateFilter(filter); err != nil {
 		return nil, fmt.Errorf("failed to validate expense filter: %w", err)
