@@ -30,7 +30,7 @@ func (h *UpdateHandler) Run(ctx context.Context, updates <-chan telego.Update) {
 
 func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 	message := update.Message
-	if message == nil || message.Chat.Type != telego.ChatTypePrivate || message.From == nil || message.Text == "" {
+	if message == nil || message.From == nil || message.Text == "" {
 		return
 	}
 	member, err := h.users.GetByTelegramID(ctx, message.From.ID)
