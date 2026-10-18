@@ -35,7 +35,7 @@ services:
 
   bot:
     environment:
-      OPENAI_API_KEY: local
+      OPENAI_API_KEY: ""
       OPENAI_BASE_URL: http://llm:8080/v1
       OPENAI_MODEL: qwen3-14b
       OPENAI_PROXY_URL: ""
