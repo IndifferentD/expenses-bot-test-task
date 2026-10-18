@@ -75,21 +75,25 @@ func run(ctx context.Context) error {
 	from := today.AddDate(0, -6, 0)
 	days := int(today.Sub(from).Hours() / 24)
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-	expenses := expense.NewService(expense.NewRepository(database))
+	transaction, err := database.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin expense seed transaction: %w", err)
+	}
+	defer transaction.Rollback()
 	for i := range expenseCount {
 		template := samples[random.Intn(len(samples))]
 		comment := template.comments[random.Intn(len(template.comments))]
 		amount := template.minAmount + random.Int63n(template.maxAmount-template.minAmount+1)
-		item := expense.Expense{
-			UserID:   users[i%len(users)].ID,
-			Amount:   amount,
-			Category: template.category,
-			SpentAt:  expense.NewDate(from.AddDate(0, 0, random.Intn(days+1))),
-			Comment:  &comment,
-		}
-		if _, err := expenses.Create(ctx, item); err != nil {
+		spentAt := expense.NewDate(from.AddDate(0, 0, random.Intn(days+1)))
+		if _, err := transaction.ExecContext(ctx, `
+			INSERT INTO expenses (user_id, amount, category, spent_at, comment)
+			VALUES ($1, $2, $3, $4, $5)`,
+			users[i%len(users)].ID, amount, template.category, spentAt, comment); err != nil {
 			return fmt.Errorf("failed to create sample expense %d: %w", i+1, err)
 		}
+	}
+	if err := transaction.Commit(); err != nil {
+		return fmt.Errorf("failed to commit sample expenses: %w", err)
 	}
 	fmt.Printf("Added %d sample expenses for %d users (%s through %s).\n", expenseCount, len(users), from.Format(time.DateOnly), today.Format(time.DateOnly))
 	return nil
