@@ -1,0 +1,47 @@
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b10884
+    command:
+      - --hf-repo
+      - Qwen/Qwen3-14B-GGUF:Q4_K_M
+      - --alias
+      - qwen3-14b
+      - --ctx-size
+      - "8192"
+      - --n-gpu-layers
+      - "99"
+      - --jinja
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    environment:
+      LLAMA_CACHE: /models
+    volumes:
+      - expense-app-llm-models:/models
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  bot:
+    environment:
+      OPENAI_API_KEY: local
+      OPENAI_BASE_URL: http://llm:8080/v1
+      OPENAI_MODEL: qwen3-14b
+      OPENAI_PROXY_URL: ""
+    depends_on:
+      llm:
+        condition: service_healthy
+
+volumes:
+  expense-app-llm-models:
