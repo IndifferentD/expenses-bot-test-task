@@ -79,18 +79,3 @@ func (s *Service) deleteOwnedExpense(ctx context.Context, userID, id int64) (Rep
 	slog.Info("deleted expense from assistant message", "user_id", userID, "expense_id", deleted.ID, "amount", deleted.Amount, "category", deleted.Category, "spent_at", deleted.SpentAt.String())
 	return Reply{Text: expenseReply("🗑 Трата удалена", deleted)}, nil
 }
-
-func expenseChoiceLine(item expense.Expense) string {
-	comment := "—"
-	if item.Comment != nil {
-		comment = strings.Join(strings.Fields(*item.Comment), " ")
-		if comment == "" {
-			comment = "—"
-		}
-	}
-	runes := []rune(comment)
-	if len(runes) > 60 {
-		comment = string(runes[:60]) + "…"
-	}
-	return fmt.Sprintf("#%d · %s ₽ · %s · %s · %s", item.ID, formatAmount(item.Amount), categoryName(item.Category), comment, item.SpentAt.Format("02.01.2006"))
-}
