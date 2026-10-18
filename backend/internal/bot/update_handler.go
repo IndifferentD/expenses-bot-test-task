@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -40,33 +41,37 @@ func (h *UpdateHandler) Handle(ctx context.Context, update telego.Update) {
 	case err != nil:
 		slog.Error("failed to identify Telegram user", "telegram_user_id", message.From.ID, "error", err)
 	default:
-		replies, err := h.assistant.ProcessMessage(ctx, member.ID, message.Text, time.Unix(message.Date, 0))
-		if err != nil {
-			slog.Error("failed to process Telegram message", "user_id", member.ID, "error", err)
-			if sendErr := h.telegramClient.SendError(ctx, message.Chat.ID, err.Error()); sendErr != nil {
-				slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", sendErr)
-			}
-			return
-		}
-		for index, reply := range replies {
-			if index > 0 {
-				// Telegram ограничивает частоту отправки сообщений в одном чате.
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second):
-				}
-			}
-			var err error
-			if reply.RichHTML != "" {
-				err = h.telegramClient.SendRichMessage(ctx, message.Chat.ID, reply.RichHTML)
-			} else {
-				err = h.telegramClient.SendMessage(ctx, message.Chat.ID, reply.Text)
-			}
-			if err != nil {
-				slog.Error("failed to respond to Telegram message", "chat_id", message.Chat.ID, "error", err)
-				return
-			}
+		if err := h.processMessage(ctx, member.ID, message); err != nil {
+			slog.Error("failed to process Telegram message", "user_id", member.ID, "chat_id", message.Chat.ID, "error", err)
 		}
 	}
+}
+
+func (h *UpdateHandler) processMessage(ctx context.Context, userID int64, message *telego.Message) error {
+	replies, err := h.assistant.ProcessMessage(ctx, userID, message.Text, time.Unix(message.Date, 0))
+	if err != nil {
+		if sendErr := h.telegramClient.SendError(ctx, message.Chat.ID, err.Error()); sendErr != nil {
+			return fmt.Errorf("failed to send processing error (%v): %w", err, sendErr)
+		}
+		return err
+	}
+	for index, reply := range replies {
+		if index > 0 {
+			// Telegram ограничивает частоту отправки сообщений в одном чате.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Second):
+			}
+		}
+		if reply.RichHTML != "" {
+			err = h.telegramClient.SendRichMessage(ctx, message.Chat.ID, reply.RichHTML)
+		} else {
+			err = h.telegramClient.SendMessage(ctx, message.Chat.ID, reply.Text)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to send Telegram reply: %w", err)
+		}
+	}
+	return nil
 }
