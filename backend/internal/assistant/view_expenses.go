@@ -17,27 +17,19 @@ type viewExpensesInput struct {
 	DateFrom   *string            `json:"date_from"`
 	DateTo     *string            `json:"date_to"`
 	Limit      *int               `json:"limit"`
-	All        bool               `json:"all"`
 }
 
 const expenseRowsPerMessage = 50
 
-func (s *Service) listExpenses(ctx context.Context, userID int64, arguments string) ([]Reply, error) {
-	var input viewExpensesInput
-	if err := decodeArguments(arguments, &input); err != nil {
-		return nil, fmt.Errorf("failed to decode expense list request: %w", err)
-	}
+func (s *Service) listExpenses(ctx context.Context, userID int64, input viewExpensesInput) ([]Reply, error) {
 	filter, err := input.filter(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare expense list: %w", err)
 	}
 	limit := 10
-	if input.All {
-		limit = 0
-	}
-	if !input.All && input.Limit != nil {
-		if *input.Limit <= 0 {
-			return nil, errors.New("failed to validate expense list: limit must be positive")
+	if input.Limit != nil {
+		if *input.Limit < 0 {
+			return nil, errors.New("failed to validate expense list: limit must not be negative")
 		}
 		limit = *input.Limit
 	}
@@ -56,18 +48,14 @@ func (s *Service) listExpenses(ctx context.Context, userID int64, arguments stri
 	return messages, nil
 }
 
-func (s *Service) summarizeExpenses(ctx context.Context, userID int64, arguments string) (string, error) {
-	var input viewExpensesInput
-	if err := decodeArguments(arguments, &input); err != nil {
-		return "", fmt.Errorf("failed to decode expense summary request: %w", err)
-	}
+func (s *Service) summarizeExpenses(ctx context.Context, userID int64, input viewExpensesInput) (Reply, error) {
 	filter, err := input.filter(userID)
 	if err != nil {
-		return "", fmt.Errorf("failed to prepare expense summary: %w", err)
+		return Reply{}, fmt.Errorf("failed to prepare expense summary: %w", err)
 	}
 	summary, err := s.expenses.Summarize(ctx, filter)
 	if err != nil {
-		return "", fmt.Errorf("failed to summarize expenses: %w", err)
+		return Reply{}, fmt.Errorf("failed to summarize expenses: %w", err)
 	}
 	var reply strings.Builder
 	reply.WriteString("📊 Сводка по тратам\n")
@@ -87,7 +75,7 @@ func (s *Service) summarizeExpenses(ctx context.Context, userID int64, arguments
 		fmt.Fprintf(&reply, "📅 Период: %s — %s\n", formatFilterDate(filter.DateFrom), formatFilterDate(filter.DateTo))
 	}
 	fmt.Fprintf(&reply, "\n💰 Сумма: %s ₽\n🧾 Трат: %d", formatAmount(summary.Total), summary.Count)
-	return reply.String(), nil
+	return Reply{Text: reply.String()}, nil
 }
 
 func (input viewExpensesInput) filter(userID int64) (expense.Filter, error) {

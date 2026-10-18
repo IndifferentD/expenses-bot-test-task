@@ -1,8 +1,16 @@
-package assistant
+package llm
 
 import (
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/responses"
+)
+
+const (
+	ToolAddExpense        = "add_expense"
+	ToolDeleteExpense     = "delete_expense"
+	ToolEditExpense       = "edit_expense"
+	ToolListExpenses      = "list_expenses"
+	ToolSummarizeExpenses = "summarize_expenses"
 )
 
 func addExpenseTool() responses.ToolUnionParam {
@@ -21,7 +29,7 @@ func addExpenseTool() responses.ToolUnionParam {
 		"required":             []string{"amount", "category", "spent_at", "comment"},
 		"additionalProperties": false,
 	}
-	tool := responses.ToolParamOfFunction("add_expense", parameters, true)
+	tool := responses.ToolParamOfFunction(ToolAddExpense, parameters, true)
 	tool.OfFunction.Description = openai.String("Записать новую трату пользователя.")
 	return tool
 }
@@ -39,7 +47,7 @@ func deleteExpenseTool() responses.ToolUnionParam {
 		"required":             []string{"id", "amount", "category", "spent_at", "comment"},
 		"additionalProperties": false,
 	}
-	tool := responses.ToolParamOfFunction("delete_expense", parameters, true)
+	tool := responses.ToolParamOfFunction(ToolDeleteExpense, parameters, true)
 	tool.OfFunction.Description = openai.String("Удалить трату по указанному ID или признакам из сообщения пользователя.")
 	return tool
 }
@@ -80,22 +88,21 @@ func editExpenseTool() responses.ToolUnionParam {
 		"required":             []string{"target", "changes"},
 		"additionalProperties": false,
 	}
-	tool := responses.ToolParamOfFunction("edit_expense", parameters, true)
+	tool := responses.ToolParamOfFunction(ToolEditExpense, parameters, true)
 	tool.OfFunction.Description = openai.String("Изменить поля существующей траты пользователя: target описывает старую запись, changes — новые значения.")
 	return tool
 }
 
 func listExpensesTool() responses.ToolUnionParam {
 	properties := viewFilterProperties()
-	properties["limit"] = map[string]any{"type": []string{"integer", "null"}, "description": "Сколько последних трат показать, если число указано; иначе null."}
-	properties["all"] = map[string]any{"type": "boolean", "description": "True, если пользователь просит показать все подходящие траты."}
+	properties["limit"] = map[string]any{"type": []string{"integer", "null"}, "description": "Сколько трат показать: 0 — все, null — обычное число."}
 	parameters := map[string]any{
 		"type":                 "object",
 		"properties":           properties,
-		"required":             []string{"categories", "comment", "date_from", "date_to", "limit", "all"},
+		"required":             []string{"categories", "comment", "date_from", "date_to", "limit"},
 		"additionalProperties": false,
 	}
-	tool := responses.ToolParamOfFunction("list_expenses", parameters, true)
+	tool := responses.ToolParamOfFunction(ToolListExpenses, parameters, true)
 	tool.OfFunction.Description = openai.String("Показать траты пользователя с фильтром по категориям и периоду.")
 	return tool
 }
@@ -107,7 +114,7 @@ func summarizeExpensesTool() responses.ToolUnionParam {
 		"required":             []string{"categories", "comment", "date_from", "date_to"},
 		"additionalProperties": false,
 	}
-	tool := responses.ToolParamOfFunction("summarize_expenses", parameters, true)
+	tool := responses.ToolParamOfFunction(ToolSummarizeExpenses, parameters, true)
 	tool.OfFunction.Description = openai.String("Посчитать сумму и количество трат пользователя за период или по категориям.")
 	return tool
 }

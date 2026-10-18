@@ -7,20 +7,22 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
+	"expenses-bot/backend/internal/assistant/llm"
 	"expenses-bot/backend/internal/expense"
-
-	"github.com/openai/openai-go/v3"
 )
 
+type Interpreter interface {
+	Interpret(context.Context, string, time.Time) (*llm.Call, error)
+}
+
+// Service выполняет выбранное моделью действие и формирует ответы для Telegram.
 type Service struct {
-	client   openai.Client
-	model    string
-	expenses *expense.Service
-	location *time.Location
+	interpreter Interpreter
+	expenses    *expense.Service
+	location    *time.Location
 }
 
 type Reply struct {
@@ -28,16 +30,13 @@ type Reply struct {
 	RichHTML string
 }
 
-func NewService(client openai.Client, model string, expenses *expense.Service, location *time.Location) (*Service, error) {
-	if strings.TrimSpace(model) == "" {
-		return nil, errors.New("OPENAI_MODEL is required")
-	}
-	return &Service{client: client, model: model, expenses: expenses, location: location}, nil
+func NewService(interpreter Interpreter, expenses *expense.Service, location *time.Location) *Service {
+	return &Service{interpreter: interpreter, expenses: expenses, location: location}
 }
 
 func (s *Service) ProcessMessage(ctx context.Context, userID int64, message string, sentAt time.Time) ([]Reply, error) {
 	sentAt = sentAt.In(s.location)
-	call, err := s.selectTool(ctx, message, sentAt)
+	call, err := s.interpreter.Interpret(ctx, message, sentAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interpret message: %w", err)
 	}
@@ -45,78 +44,60 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		// TODO: Учитывать текстовый ответ модели: общая фраза скрывает причину отказа или просьбу уточнить запрос.
 		return []Reply{{Text: "Я могу только добавлять, просматривать, изменять и удалять траты. Пожалуйста, уточните запрос."}}, nil
 	}
-	slog.DebugContext(ctx, "selected assistant tool", "user_id", userID, "tool", call.name, "arguments", call.arguments)
-	switch call.name {
-	case "add_expense":
-		created, err := s.addExpense(ctx, userID, call.arguments, sentAt)
+	slog.DebugContext(ctx, "selected assistant tool", "user_id", userID, "tool", call.Name, "arguments", call.Arguments)
+	switch call.Name {
+	case llm.ToolAddExpense:
+		var input addExpenseInput
+		if err := decodeArguments(call.Arguments, &input); err != nil {
+			return nil, fmt.Errorf("failed to decode expense details: %w", err)
+		}
+		reply, err := s.addExpense(ctx, userID, input, sentAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute add_expense: %w", err)
 		}
-		return []Reply{{Text: expenseReply("✅ Трата добавлена", created)}}, nil
-	case "delete_expense":
-		reply, err := s.deleteExpense(ctx, userID, call.arguments)
+		return []Reply{reply}, nil
+	case llm.ToolDeleteExpense:
+		var input deleteExpenseInput
+		if err := decodeArguments(call.Arguments, &input); err != nil {
+			return nil, fmt.Errorf("failed to decode deletion details: %w", err)
+		}
+		reply, err := s.deleteExpense(ctx, userID, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute delete_expense: %w", err)
 		}
-		return []Reply{{Text: reply}}, nil
-	case "edit_expense":
-		reply, err := s.editExpense(ctx, userID, call.arguments)
+		return []Reply{reply}, nil
+	case llm.ToolEditExpense:
+		var input editExpenseInput
+		if err := decodeArguments(call.Arguments, &input); err != nil {
+			return nil, fmt.Errorf("failed to decode edit details: %w", err)
+		}
+		reply, err := s.editExpense(ctx, userID, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute edit_expense: %w", err)
 		}
 		return []Reply{reply}, nil
-	case "list_expenses":
-		replies, err := s.listExpenses(ctx, userID, call.arguments)
+	case llm.ToolListExpenses:
+		var input viewExpensesInput
+		if err := decodeArguments(call.Arguments, &input); err != nil {
+			return nil, fmt.Errorf("failed to decode expense list request: %w", err)
+		}
+		replies, err := s.listExpenses(ctx, userID, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute list_expenses: %w", err)
 		}
 		return replies, nil
-	case "summarize_expenses":
-		reply, err := s.summarizeExpenses(ctx, userID, call.arguments)
+	case llm.ToolSummarizeExpenses:
+		var input viewExpensesInput
+		if err := decodeArguments(call.Arguments, &input); err != nil {
+			return nil, fmt.Errorf("failed to decode expense summary request: %w", err)
+		}
+		reply, err := s.summarizeExpenses(ctx, userID, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute summarize_expenses: %w", err)
 		}
-		return []Reply{{Text: reply}}, nil
+		return []Reply{reply}, nil
 	default:
-		return nil, fmt.Errorf("failed to execute unknown tool %q", call.name)
-	}
-}
-
-func expenseReply(title string, created expense.Expense) string {
-	comment := "—"
-	if created.Comment != nil {
-		comment = *created.Comment
-	}
-	return fmt.Sprintf(
-		"%s\n\n💰 Сумма: %s ₽\n🏷 Категория: %s\n📝 Комментарий: %s\n📅 Дата: %s",
-		title, formatAmount(created.Amount), categoryName(created.Category), comment, created.SpentAt.Format("02.01.2006"),
-	)
-}
-
-func formatAmount(amount int64) string {
-	digits := strconv.FormatInt(amount, 10)
-	for i := len(digits) - 3; i > 0; i -= 3 {
-		digits = digits[:i] + " " + digits[i:]
-	}
-	return digits
-}
-
-func categoryName(category expense.Category) string {
-	switch category {
-	case expense.CategoryFood:
-		return "Еда"
-	case expense.CategoryTransport:
-		return "Транспорт"
-	case expense.CategoryHousing:
-		return "Жильё"
-	case expense.CategoryEntertainment:
-		return "Развлечения"
-	case expense.CategoryHealth:
-		return "Здоровье"
-	case expense.CategoryShopping:
-		return "Покупки"
-	default:
-		return "Другое"
+		return nil, fmt.Errorf("failed to execute unknown tool %q", call.Name)
 	}
 }
 

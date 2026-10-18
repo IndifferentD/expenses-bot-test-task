@@ -12,6 +12,7 @@ import (
 
 	"expenses-bot/backend/internal"
 	"expenses-bot/backend/internal/assistant"
+	"expenses-bot/backend/internal/assistant/llm"
 	"expenses-bot/backend/internal/bot"
 	"expenses-bot/backend/internal/db"
 	"expenses-bot/backend/internal/expense"
@@ -57,14 +58,15 @@ func main() {
 		log.Fatalf("failed to load timezone %q: %v", settings.Timezone, err)
 	}
 	expenseService := expense.NewService(expense.NewRepository(database))
-	openAIClient, err := assistant.NewOpenAIClient(settings.OpenAIAPIKey, settings.OpenAIBaseURL, settings.OpenAIProxyURL)
+	openAIClient, err := llm.NewOpenAIClient(settings.OpenAIAPIKey, settings.OpenAIBaseURL, settings.OpenAIProxyURL)
 	if err != nil {
 		log.Fatalf("failed to initialize OpenAI client: %v", err)
 	}
-	assistantService, err := assistant.NewService(openAIClient, settings.OpenAIModel, expenseService, location)
+	interpreter, err := llm.NewInterpreter(openAIClient, settings.OpenAIModel)
 	if err != nil {
-		log.Fatalf("failed to initialize expense assistant: %v", err)
+		log.Fatalf("failed to initialize LLM interpreter: %v", err)
 	}
+	assistantService := assistant.NewService(interpreter, expenseService, location)
 
 	telegramClient, err := bot.NewClient(settings.TelegramBotToken, settings.TelegramProxyURL)
 	if err != nil {

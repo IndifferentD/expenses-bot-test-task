@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 	"log/slog"
 	"strings"
 	"time"
@@ -29,11 +28,7 @@ type editExpenseInput struct {
 	} `json:"changes"`
 }
 
-func (s *Service) editExpense(ctx context.Context, userID int64, arguments string) (Reply, error) {
-	var input editExpenseInput
-	if err := decodeArguments(arguments, &input); err != nil {
-		return Reply{}, fmt.Errorf("failed to decode edit details: %w", err)
-	}
+func (s *Service) editExpense(ctx context.Context, userID int64, input editExpenseInput) (Reply, error) {
 	if input.Target.ID != nil && input.Target.Latest {
 		return Reply{Text: "Уточните, какую трату изменить: по ID или последнюю добавленную."}, nil
 	}
@@ -70,7 +65,7 @@ func (s *Service) editExpense(ctx context.Context, userID int64, arguments strin
 			return Reply{Text: "Не нашёл подходящих трат среди ваших записей."}, nil
 		}
 		if len(page.Items) != 1 || page.NextCursor != nil {
-			return Reply{RichHTML: editExpenseChoices(page, changes)}, nil
+			return Reply{RichHTML: expenseChoices(page, func(id int64) string { return editExpenseCommand(id, changes) })}, nil
 		}
 		selected = page.Items[0]
 	}
@@ -111,28 +106,6 @@ func changedValue(before, after string) string {
 		return after
 	}
 	return before + " → " + after
-}
-
-func expenseComment(item expense.Expense) string {
-	if item.Comment == nil || *item.Comment == "" {
-		return "—"
-	}
-	return *item.Comment
-}
-
-func editExpenseChoices(page expense.ListPage, changes expense.ExpenseChanges) string {
-	var reply strings.Builder
-	reply.WriteString("<p>Нашёл несколько трат:</p>")
-	for _, item := range page.Items {
-		reply.WriteString("<p>")
-		reply.WriteString(html.EscapeString(expenseChoiceLine(item)))
-		fmt.Fprintf(&reply, "<br><code>%s</code></p>", html.EscapeString(editExpenseCommand(item.ID, changes)))
-	}
-	if page.NextCursor != nil {
-		reply.WriteString("<p>Показаны первые пять совпадений.</p>")
-	}
-	reply.WriteString("<p>Скопируйте команду под нужной тратой и отправьте боту.</p>")
-	return reply.String()
 }
 
 func editExpenseCommand(id int64, changes expense.ExpenseChanges) string {
