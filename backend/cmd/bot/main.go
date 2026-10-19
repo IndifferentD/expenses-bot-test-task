@@ -23,15 +23,17 @@ import (
 )
 
 type Config struct {
+	DatabaseURL string `env:"DATABASE_URL,required"`
+	LogLevel    string `env:"LOG_LEVEL" envDefault:"INFO"`
+
+	OpenAIAPIKey   string `env:"OPENAI_API_KEY"`
+	OpenAIBaseURL  string `env:"OPENAI_BASE_URL" envDefault:"https://api.openai.com/v1"`
+	OpenAIModel    string `env:"OPENAI_MODEL" envDefault:"gpt-6-luna"`
+	OpenAIProxyURL string `env:"OPENAI_PROXY_URL"`
+	Timezone       string `env:"TIMEZONE" envDefault:"Europe/Moscow"`
+
 	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN,required"`
 	TelegramProxyURL string `env:"TELEGRAM_PROXY_URL"`
-	DatabaseURL      string `env:"DATABASE_URL,required"`
-	LogLevel         string `env:"LOG_LEVEL" envDefault:"INFO"`
-	OpenAIAPIKey     string `env:"OPENAI_API_KEY"`
-	OpenAIBaseURL    string `env:"OPENAI_BASE_URL" envDefault:"https://api.openai.com/v1"`
-	OpenAIModel      string `env:"OPENAI_MODEL" envDefault:"gpt-6-luna"`
-	OpenAIProxyURL   string `env:"OPENAI_PROXY_URL"`
-	Timezone         string `env:"TIMEZONE" envDefault:"Europe/Moscow"`
 }
 
 func main() {
@@ -64,10 +66,6 @@ func run() error {
 		}
 	}()
 
-	location, err := time.LoadLocation(settings.Timezone)
-	if err != nil {
-		return fmt.Errorf("failed to load timezone %q: %w", settings.Timezone, err)
-	}
 	expenseService := expense.NewService(expense.NewRepository(database))
 	openAIClient, err := llm.NewOpenAIClient(settings.OpenAIAPIKey, settings.OpenAIBaseURL, settings.OpenAIProxyURL)
 	if err != nil {
@@ -77,19 +75,23 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize LLM interpreter: %w", err)
 	}
+	location, err := time.LoadLocation(settings.Timezone)
+	if err != nil {
+		return fmt.Errorf("failed to load timezone %q: %w", settings.Timezone, err)
+	}
 	assistantService := assistant.NewService(interpreter, expenseService, location)
 
 	telegramClient, err := bot.NewClient(settings.TelegramBotToken, settings.TelegramProxyURL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Telegram bot: %w", err)
 	}
+	userService := user.NewService(user.NewRepository(database))
+	updateHandler := bot.NewUpdateHandler(userService, assistantService, telegramClient)
+
 	updates, err := telegramClient.StartPolling(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to receive Telegram updates: %w", err)
 	}
-
-	userService := user.NewService(user.NewRepository(database))
-	updateHandler := bot.NewUpdateHandler(userService, assistantService, telegramClient)
 	updateHandler.Run(ctx, updates)
 
 	slog.Info("stopped Telegram bot")
