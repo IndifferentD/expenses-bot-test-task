@@ -69,7 +69,6 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to load timezone %q: %w", settings.Timezone, err)
 	}
-	// Вычисляем «сегодня» в часовом поясе бота, затем работаем с календарными днями UTC.
 	now := time.Now().In(location)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	from := today.AddDate(0, -6, 0)
