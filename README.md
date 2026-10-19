@@ -43,7 +43,7 @@ docker compose exec api seed-expenses
 
 ## Локальная модель
 
-`compose.local-llm.yaml` запускает бота с локальной `Qwen3-14B` в формате GGUF `Q4_K_M` через `llama.cpp`. Для этой CUDA-конфигурации нужен доступ контейнера к NVIDIA GPU; в Linux Docker Engine — драйвер и [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). У меня модель занимала около 10 ГБ видеопамяти. Запустить сервисы:
+При желании бота можно запустить с локальной моделью. Файл `compose.local-llm.yaml` поднимает `llama.cpp` с `Qwen3-14B` в формате GGUF `Q4_K_M` и подключает к нему бота. Для этой CUDA-конфигурации нужен доступ контейнера к NVIDIA GPU; в Linux Docker Engine — драйвер и [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). У меня модель занимала около 10 ГБ видеопамяти. Запустить сервисы:
 
 ```sh
 docker compose -f compose.yaml -f compose.local-llm.yaml up --build
