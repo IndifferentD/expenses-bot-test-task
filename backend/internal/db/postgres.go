@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,8 +22,7 @@ func ConnectPostgres(ctx context.Context, databaseURL string) (*sqlx.DB, error) 
 	db.SetConnMaxLifetime(time.Hour)
 	db.SetConnMaxIdleTime(15 * time.Minute)
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, errors.Join(fmt.Errorf("failed to connect to database: %w", err), db.Close())
 	}
 	return db, nil
 }

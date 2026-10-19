@@ -51,7 +51,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			slog.Error("failed to close database", "error", err)
+		}
+	}()
 
 	expenseService := expense.NewService(expense.NewRepository(database))
 	userService := user.NewService(user.NewRepository(database))

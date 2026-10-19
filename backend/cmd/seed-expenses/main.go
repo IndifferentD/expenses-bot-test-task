@@ -54,7 +54,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	users, err := user.NewRepository(database).List(ctx)
 	if err != nil {
@@ -79,7 +79,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin expense seed transaction: %w", err)
 	}
-	defer transaction.Rollback()
+	defer func() { _ = transaction.Rollback() }()
 	for i := range expenseCount {
 		template := samples[random.Intn(len(samples))]
 		comment := template.comments[random.Intn(len(template.comments))]

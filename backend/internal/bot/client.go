@@ -25,7 +25,7 @@ func NewClient(token, proxyAddress string) (*Client, error) {
 			return nil, fmt.Errorf("failed to parse Telegram proxy URL: %w", err)
 		}
 		if proxyURL.Host == "" {
-			return nil, errors.New("Telegram proxy URL must include a host")
+			return nil, errors.New("telegram proxy URL must include a host")
 		}
 		switch proxyURL.Scheme {
 		case "http", "https", "socks5", "socks5h":
