@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref, watch } from 'vue';
-import type { User } from '../user/user';
-import CategoryIcon from './CategoryIcon.vue';
+import { nextTick, onMounted, reactive, ref, watch } from "vue";
+import type { User } from "../user/user";
+import CategoryIcon from "./CategoryIcon.vue";
 import {
   categoryLabel,
   categoryOptions,
@@ -11,7 +11,7 @@ import {
   type Category,
   type Expense,
   type ExpenseInput,
-} from './expense';
+} from "./expense";
 
 const props = defineProps<{
   expense: Expense | null;
@@ -32,7 +32,7 @@ const emit = defineEmits<{
 interface Draft {
   userId: string;
   amount: string;
-  category: Category | '';
+  category: Category | "";
   spentAt: string;
   comment: string;
 }
@@ -40,31 +40,34 @@ interface Draft {
 function today(): string {
   const date = new Date();
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function makeDraft(expense: Expense | null): Draft {
   return {
-    userId: expense ? String(expense.user_id) : '',
-    amount: expense ? String(expense.amount) : '',
-    category: expense?.category ?? '',
+    userId: expense ? String(expense.user_id) : "",
+    amount: expense ? String(expense.amount) : "",
+    category: expense?.category ?? "",
     spentAt: expense?.spent_at ?? today(),
-    comment: expense?.comment ?? '',
+    comment: expense?.comment ?? "",
   };
 }
 
 const draft = reactive(makeDraft(props.expense));
 const firstField = ref<HTMLSelectElement | null>(null);
 
-watch(() => props.editing, async (editing) => {
-  if (editing) {
-    Object.assign(draft, makeDraft(props.expense));
-    await nextTick();
-    firstField.value?.focus();
-  }
-});
+watch(
+  () => props.editing,
+  async (editing) => {
+    if (editing) {
+      Object.assign(draft, makeDraft(props.expense));
+      await nextTick();
+      firstField.value?.focus();
+    }
+  },
+);
 
 onMounted(() => {
   if (props.editing) firstField.value?.focus();
@@ -75,27 +78,27 @@ function submit(): void {
   const amount = Number(draft.amount);
 
   if (!Number.isSafeInteger(userId) || userId <= 0) {
-    emit('invalid', 'Выберите участника семьи.');
+    emit("invalid", "Выберите участника семьи.");
     return;
   }
   if (!props.users.some((user) => user.id === userId)) {
-    emit('invalid', 'Выбранный участник не найден.');
+    emit("invalid", "Выбранный участник не найден.");
     return;
   }
   if (!Number.isSafeInteger(amount) || amount <= 0) {
-    emit('invalid', 'Сумма должна быть положительным целым числом.');
+    emit("invalid", "Сумма должна быть положительным целым числом.");
     return;
   }
   if (!draft.category) {
-    emit('invalid', 'Выберите категорию траты.');
+    emit("invalid", "Выберите категорию траты.");
     return;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.spentAt)) {
-    emit('invalid', 'Укажите дату траты.');
+    emit("invalid", "Укажите дату траты.");
     return;
   }
 
-  emit('save', {
+  emit("save", {
     user_id: userId,
     amount,
     category: draft.category,
@@ -106,8 +109,13 @@ function submit(): void {
 </script>
 
 <template>
-  <tr :class="{ 'expense-row--editing': editing, 'expense-row--new': !expense }" :aria-busy="saving">
-    <th scope="row" class="cell-id">{{ expense ? `#${expense.id}` : 'Новая' }}</th>
+  <tr
+    :class="{ 'expense-row--editing': editing, 'expense-row--new': !expense }"
+    :aria-busy="saving"
+  >
+    <th scope="row" class="cell-id">
+      {{ expense ? `#${expense.id}` : "Новая" }}
+    </th>
     <td>
       <select
         v-if="editing"
@@ -118,9 +126,13 @@ function submit(): void {
         :disabled="saving"
       >
         <option value="" disabled>Выберите участника</option>
-        <option v-for="user in users" :key="user.id" :value="String(user.id)">{{ user.alias }}</option>
+        <option v-for="user in users" :key="user.id" :value="String(user.id)">
+          {{ user.alias }}
+        </option>
       </select>
-      <span v-else>{{ users.find((user) => user.id === expense?.user_id)?.alias ?? '—' }}</span>
+      <span v-else>{{
+        users.find((user) => user.id === expense?.user_id)?.alias ?? "—"
+      }}</span>
     </td>
     <td class="cell-amount">
       <input
@@ -140,9 +152,20 @@ function submit(): void {
     <td>
       <div v-if="editing" class="category-select">
         <CategoryIcon v-if="draft.category" :category="draft.category" />
-        <select v-model="draft.category" class="table-input table-select" aria-label="Категория траты" :disabled="saving">
+        <select
+          v-model="draft.category"
+          class="table-input table-select"
+          aria-label="Категория траты"
+          :disabled="saving"
+        >
           <option value="" disabled>Выберите категорию</option>
-          <option v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+          <option
+            v-for="option in categoryOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
         </select>
       </div>
       <span v-else-if="expense" class="category-pill">
@@ -171,37 +194,76 @@ function submit(): void {
         placeholder="Необязательно"
         :disabled="saving"
       />
-      <span v-else :class="{ 'text-muted': !expense?.comment }">{{ expense?.comment || '—' }}</span>
+      <span v-else :class="{ 'text-muted': !expense?.comment }">{{
+        expense?.comment || "—"
+      }}</span>
     </td>
-    <td class="cell-timestamp">{{ expense ? formatTimestamp(expense.created_at) : '—' }}</td>
-    <td class="cell-timestamp">{{ expense ? formatTimestamp(expense.updated_at) : '—' }}</td>
+    <td class="cell-timestamp">
+      {{ expense ? formatTimestamp(expense.created_at) : "—" }}
+    </td>
+    <td class="cell-timestamp">
+      {{ expense ? formatTimestamp(expense.updated_at) : "—" }}
+    </td>
     <td class="cell-actions">
       <div class="row-actions">
         <template v-if="editing">
           <button
             class="icon-button icon-button--save"
             type="button"
-            :aria-label="expense ? `Сохранить изменения траты #${expense.id}` : 'Добавить трату'"
+            :aria-label="
+              expense
+                ? `Сохранить изменения траты #${expense.id}`
+                : 'Добавить трату'
+            "
             :title="expense ? 'Сохранить' : 'Добавить'"
             :disabled="saving"
             @click="submit"
           >
-            <svg v-if="expense" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              v-if="expense"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="m5 12 4.5 4.5L19 7" />
             </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <svg
+              v-else
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
           <button
             class="icon-button icon-button--cancel"
             type="button"
-            :aria-label="expense ? `Отменить изменения траты #${expense.id}` : 'Отменить добавление траты'"
+            :aria-label="
+              expense
+                ? `Отменить изменения траты #${expense.id}`
+                : 'Отменить добавление траты'
+            "
             title="Отменить"
             :disabled="saving"
             @click="emit('cancel')"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M5.6 5.6 18.4 18.4" />
             </svg>
@@ -216,8 +278,18 @@ function submit(): void {
             :disabled="locked"
             @click="emit('edit')"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m15.5 5.5 3 3M4 20l4.3-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.3 16 4 20Z" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="m15.5 5.5 3 3M4 20l4.3-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.3 16 4 20Z"
+              />
             </svg>
           </button>
           <button
@@ -228,7 +300,14 @@ function submit(): void {
             :disabled="locked"
             @click="emit('delete')"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M6 6 18 18M18 6 6 18" />
             </svg>
           </button>

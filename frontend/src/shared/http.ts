@@ -1,21 +1,35 @@
-export async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function request<T>(
+  path: string,
+  method = "GET",
+  body?: unknown,
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers:
+        body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error('Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз.');
+    throw new Error(
+      "Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз.",
+    );
   }
 
   if (!response.ok) {
     let message = `Сервер вернул ошибку ${response.status}.`;
-    if (response.headers.get('Content-Type')?.includes('application/problem+json')) {
+    if (
+      response.headers.get("Content-Type")?.includes("application/problem+json")
+    ) {
       try {
         const problem: unknown = await response.json();
-        if (problem && typeof problem === 'object' && 'detail' in problem && typeof problem.detail === 'string') {
+        if (
+          problem &&
+          typeof problem === "object" &&
+          "detail" in problem &&
+          typeof problem.detail === "string"
+        ) {
           message = problem.detail;
         }
       } catch {

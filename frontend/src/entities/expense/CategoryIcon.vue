@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Category } from './expense';
+import type { Category } from "./expense";
 
 defineProps<{ category: Category }>();
 </script>
@@ -29,7 +29,9 @@ defineProps<{ category: Category }>();
       <path d="m3 10 9-7 9 7v11H3zM9 21v-7h6v7" />
     </template>
     <template v-else-if="category === 'entertainment'">
-      <path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4zM12 5v3m0 3v2m0 3v3" />
+      <path
+        d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4zM12 5v3m0 3v2m0 3v3"
+      />
     </template>
     <template v-else-if="category === 'health'">
       <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" />

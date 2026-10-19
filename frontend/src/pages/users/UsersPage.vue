@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import UserRow from '../../entities/user/UserRow.vue';
-import { usersApi } from '../../entities/user/usersApi';
-import type { User, UserInput } from '../../entities/user/user';
-import ErrorDialog from '../../shared/ErrorDialog.vue';
+import { computed, onMounted, ref } from "vue";
+import UserRow from "../../entities/user/UserRow.vue";
+import { usersApi } from "../../entities/user/usersApi";
+import type { User, UserInput } from "../../entities/user/user";
+import ErrorDialog from "../../shared/ErrorDialog.vue";
 
 const users = ref<User[]>([]);
 const loading = ref(true);
@@ -11,13 +11,21 @@ const loadError = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
 const adding = ref(false);
 const editingId = ref<number | null>(null);
-const savingKey = ref<number | 'new' | null>(null);
+const savingKey = ref<number | "new" | null>(null);
 const deletingId = ref<number | null>(null);
 
-const isLocked = computed(() => adding.value || editingId.value !== null || savingKey.value !== null || deletingId.value !== null);
+const isLocked = computed(
+  () =>
+    adding.value ||
+    editingId.value !== null ||
+    savingKey.value !== null ||
+    deletingId.value !== null,
+);
 
 function messageFrom(error: unknown): string {
-  return error instanceof Error ? error.message : 'Произошла неизвестная ошибка.';
+  return error instanceof Error
+    ? error.message
+    : "Произошла неизвестная ошибка.";
 }
 
 async function load(): Promise<void> {
@@ -42,10 +50,12 @@ function startEdit(id: number): void {
 
 async function saveNew(input: UserInput): Promise<void> {
   if (savingKey.value !== null) return;
-  savingKey.value = 'new';
+  savingKey.value = "new";
   try {
     const created = await usersApi.create(input);
-    users.value = [...users.value, created].sort((a, b) => a.alias.localeCompare(b.alias, 'ru') || a.id - b.id);
+    users.value = [...users.value, created].sort(
+      (a, b) => a.alias.localeCompare(b.alias, "ru") || a.id - b.id,
+    );
     adding.value = false;
   } catch (error) {
     errorMessage.value = messageFrom(error);
@@ -59,8 +69,9 @@ async function saveExisting(id: number, input: UserInput): Promise<void> {
   savingKey.value = id;
   try {
     const updated = await usersApi.update(id, input);
-    users.value = users.value.map((user) => user.id === id ? updated : user)
-      .sort((a, b) => a.alias.localeCompare(b.alias, 'ru') || a.id - b.id);
+    users.value = users.value
+      .map((user) => (user.id === id ? updated : user))
+      .sort((a, b) => a.alias.localeCompare(b.alias, "ru") || a.id - b.id);
     editingId.value = null;
   } catch (error) {
     errorMessage.value = messageFrom(error);
@@ -70,7 +81,13 @@ async function saveExisting(id: number, input: UserInput): Promise<void> {
 }
 
 async function remove(user: User): Promise<void> {
-  if (isLocked.value || !window.confirm(`Удалить участника «${user.alias}»? Это действие нельзя отменить.`)) return;
+  if (
+    isLocked.value ||
+    !window.confirm(
+      `Удалить участника «${user.alias}»? Это действие нельзя отменить.`,
+    )
+  )
+    return;
   deletingId.value = user.id;
   try {
     await usersApi.remove(user.id);
@@ -82,34 +99,65 @@ async function remove(user: User): Promise<void> {
   }
 }
 
-onMounted(() => { void load(); });
+onMounted(() => {
+  void load();
+});
 </script>
 
 <template>
   <main class="page">
     <div class="page-intro">
       <div>
-        <h1 class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span> Участники</h1>
-        <p class="page-intro__subtitle">Добавьте членов семьи и укажите их Telegram ID, чтобы связывать с ними траты.</p>
+        <h1 class="eyebrow">
+          <span class="eyebrow__dot" aria-hidden="true"></span> Участники
+        </h1>
+        <p class="page-intro__subtitle">
+          Добавьте членов семьи и укажите их Telegram ID, чтобы связывать с ними
+          траты.
+        </p>
       </div>
     </div>
 
     <section class="users-panel" aria-labelledby="users-title">
       <div class="panel-heading">
         <div class="panel-heading__left">
-          <button class="button button--primary add-button" type="button" :disabled="loading || Boolean(loadError) || isLocked" @click="startAdd">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <button
+            class="button button--primary add-button"
+            type="button"
+            :disabled="loading || Boolean(loadError) || isLocked"
+            @click="startAdd"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
             Добавить участника
           </button>
           <div>
             <h2 id="users-title">Члены семьи</h2>
-            <p>Участника с тратами удалить нельзя</p>
           </div>
         </div>
-        <button class="button button--quiet" type="button" :disabled="loading || isLocked" @click="load">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <button
+          class="button button--quiet"
+          type="button"
+          :disabled="loading || isLocked"
+          @click="load"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M20 7v5h-5M4 17v-5h5" />
             <path d="M5.7 9A7 7 0 0 1 18 7l2 5M4 12l2 5a7 7 0 0 0 12.3-2" />
           </svg>
@@ -119,7 +167,9 @@ onMounted(() => { void load(); });
 
       <div class="table-scroll">
         <table class="users-table">
-          <caption class="sr-only">Члены семьи</caption>
+          <caption class="sr-only">
+            Члены семьи
+          </caption>
           <thead>
             <tr>
               <th scope="col">ID</th>
@@ -145,11 +195,19 @@ onMounted(() => { void load(); });
             <tr v-else-if="loadError">
               <td colspan="4" class="state-cell state-cell--error">
                 <span>{{ loadError }}</span>
-                <button class="button button--quiet" type="button" @click="load">Повторить</button>
+                <button
+                  class="button button--quiet"
+                  type="button"
+                  @click="load"
+                >
+                  Повторить
+                </button>
               </td>
             </tr>
             <tr v-else-if="users.length === 0 && !adding">
-              <td colspan="4" class="state-cell">Участников пока нет. Добавьте первого.</td>
+              <td colspan="4" class="state-cell">
+                Участников пока нет. Добавьте первого.
+              </td>
             </tr>
             <UserRow
               v-for="user in users"
@@ -169,9 +227,15 @@ onMounted(() => { void load(); });
         </table>
       </div>
 
-      <div class="panel-footer"><span>Всего участников: {{ users.length }}</span></div>
+      <div class="panel-footer">
+        <span>Всего участников: {{ users.length }}</span>
+      </div>
     </section>
 
-    <ErrorDialog v-if="errorMessage" :message="errorMessage" @close="errorMessage = null" />
+    <ErrorDialog
+      v-if="errorMessage"
+      :message="errorMessage"
+      @close="errorMessage = null"
+    />
   </main>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref, watch } from 'vue';
-import type { User, UserInput } from './user';
+import { nextTick, onMounted, reactive, ref, watch } from "vue";
+import type { User, UserInput } from "./user";
 
 const props = defineProps<{
   user: User | null;
@@ -19,21 +19,24 @@ const emit = defineEmits<{
 
 function makeDraft(user: User | null) {
   return {
-    telegramUserId: user ? String(user.telegram_user_id) : '',
-    alias: user?.alias ?? '',
+    telegramUserId: user ? String(user.telegram_user_id) : "",
+    alias: user?.alias ?? "",
   };
 }
 
 const draft = reactive(makeDraft(props.user));
 const firstField = ref<HTMLInputElement | null>(null);
 
-watch(() => props.editing, async (editing) => {
-  if (editing) {
-    Object.assign(draft, makeDraft(props.user));
-    await nextTick();
-    firstField.value?.focus();
-  }
-});
+watch(
+  () => props.editing,
+  async (editing) => {
+    if (editing) {
+      Object.assign(draft, makeDraft(props.user));
+      await nextTick();
+      firstField.value?.focus();
+    }
+  },
+);
 
 onMounted(() => {
   if (props.editing) firstField.value?.focus();
@@ -43,20 +46,23 @@ function submit(): void {
   const telegramUserId = Number(draft.telegramUserId);
   const alias = draft.alias.trim();
   if (!Number.isSafeInteger(telegramUserId) || telegramUserId <= 0) {
-    emit('invalid', 'Telegram ID должен быть положительным целым числом.');
+    emit("invalid", "Telegram ID должен быть положительным целым числом.");
     return;
   }
   if (!alias) {
-    emit('invalid', 'Укажите имя участника.');
+    emit("invalid", "Укажите имя участника.");
     return;
   }
-  emit('save', { telegram_user_id: telegramUserId, alias });
+  emit("save", { telegram_user_id: telegramUserId, alias });
 }
 </script>
 
 <template>
-  <tr :class="{ 'user-row--editing': editing, 'user-row--new': !user }" :aria-busy="saving">
-    <th scope="row" class="cell-id">{{ user ? `#${user.id}` : 'Новый' }}</th>
+  <tr
+    :class="{ 'user-row--editing': editing, 'user-row--new': !user }"
+    :aria-busy="saving"
+  >
+    <th scope="row" class="cell-id">{{ user ? `#${user.id}` : "Новый" }}</th>
     <td>
       <input
         v-if="editing"
@@ -93,27 +99,60 @@ function submit(): void {
           <button
             class="icon-button icon-button--save"
             type="button"
-            :aria-label="user ? `Сохранить изменения участника #${user.id}` : 'Добавить участника'"
+            :aria-label="
+              user
+                ? `Сохранить изменения участника #${user.id}`
+                : 'Добавить участника'
+            "
             :title="user ? 'Сохранить' : 'Добавить'"
             :disabled="saving"
             @click="submit"
           >
-            <svg v-if="user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              v-if="user"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="m5 12 4.5 4.5L19 7" />
             </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <svg
+              v-else
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
           <button
             class="icon-button icon-button--cancel"
             type="button"
-            :aria-label="user ? `Отменить изменения участника #${user.id}` : 'Отменить добавление участника'"
+            :aria-label="
+              user
+                ? `Отменить изменения участника #${user.id}`
+                : 'Отменить добавление участника'
+            "
             title="Отменить"
             :disabled="saving"
             @click="emit('cancel')"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M5.6 5.6 18.4 18.4" />
             </svg>
@@ -128,8 +167,18 @@ function submit(): void {
             :disabled="locked"
             @click="emit('edit')"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m15.5 5.5 3 3M4 20l4.3-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.3 16 4 20Z" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="m15.5 5.5 3 3M4 20l4.3-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.3 16 4 20Z"
+              />
             </svg>
           </button>
           <button
@@ -140,7 +189,14 @@ function submit(): void {
             :disabled="locked"
             @click="emit('delete')"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M6 6 18 18M18 6 6 18" />
             </svg>
           </button>

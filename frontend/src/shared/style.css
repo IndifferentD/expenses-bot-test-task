@@ -1,6 +1,11 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    Inter,
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   line-height: 1.5;
   color: #e9eff7;
   background: #0d1520;
@@ -35,7 +40,8 @@ body,
 body {
   min-width: 320px;
   margin: 0;
-  background: radial-gradient(circle at 80% -10%, #1e3650 0, transparent 38%), #0d1520;
+  background:
+    radial-gradient(circle at 80% -10%, #1e3650 0, transparent 38%), #0d1520;
 }
 
 button,
@@ -266,7 +272,9 @@ a:focus-visible {
   font-size: 0.86rem;
   font-weight: 650;
   white-space: nowrap;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
 }
 
 .button svg {
@@ -298,7 +306,9 @@ a:focus-visible {
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(175px, 1.1fr) minmax(210px, 1.4fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) auto;
+  grid-template-columns:
+    minmax(175px, 1.1fr) minmax(210px, 1.4fr) minmax(150px, 0.9fr)
+    minmax(150px, 0.9fr) auto;
   align-items: end;
   gap: 14px;
   padding: 21px 26px 23px;
@@ -338,7 +348,7 @@ a:focus-visible {
 }
 
 .multi-select__trigger::after {
-  content: '⌄';
+  content: "⌄";
   color: var(--muted);
 }
 
@@ -405,13 +415,27 @@ a:focus-visible {
   height: 18px;
 }
 
-.category-icon--food { color: #f3b56b; }
-.category-icon--transport { color: #77baff; }
-.category-icon--housing { color: #69d2bf; }
-.category-icon--entertainment { color: #c6a0ff; }
-.category-icon--health { color: #ff8fa7; }
-.category-icon--shopping { color: #b4dd78; }
-.category-icon--other { color: #b0bed0; }
+.category-icon--food {
+  color: #f3b56b;
+}
+.category-icon--transport {
+  color: #77baff;
+}
+.category-icon--housing {
+  color: #69d2bf;
+}
+.category-icon--entertainment {
+  color: #c6a0ff;
+}
+.category-icon--health {
+  color: #ff8fa7;
+}
+.category-icon--shopping {
+  color: #b4dd78;
+}
+.category-icon--other {
+  color: #b0bed0;
+}
 
 .filter-control,
 .table-input {

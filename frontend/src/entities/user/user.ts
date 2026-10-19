@@ -4,4 +4,4 @@ export interface User {
   alias: string;
 }
 
-export type UserInput = Pick<User, 'telegram_user_id' | 'alias'>;
+export type UserInput = Pick<User, "telegram_user_id" | "alias">;
