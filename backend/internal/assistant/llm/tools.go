@@ -1,6 +1,8 @@
 package llm
 
 import (
+	"expenses-bot/backend/internal/expense"
+
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/responses"
 )
@@ -20,7 +22,7 @@ func addExpenseTool() responses.ToolUnionParam {
 			"amount": map[string]any{"type": "integer", "description": "Целая положительная сумма в рублях из сообщения пользователя."},
 			"category": map[string]any{
 				"type":        "string",
-				"enum":        []string{"food", "transport", "housing", "entertainment", "health", "shopping", "other"},
+				"enum":        categoryEnum(false),
 				"description": "Категория: food — еда, transport — транспорт, housing — жильё, entertainment — развлечения, health — здоровье, shopping — покупки, other — другое.",
 			},
 			"spent_at": map[string]any{"type": []string{"string", "null"}, "description": "Дата траты YYYY-MM-DD, если указана, иначе null."},
@@ -40,7 +42,7 @@ func deleteExpenseTool() responses.ToolUnionParam {
 		"properties": map[string]any{
 			"id":       map[string]any{"type": []string{"integer", "null"}, "description": "ID траты после #, если указан, иначе null."},
 			"amount":   map[string]any{"type": []string{"integer", "null"}, "description": "Сумма траты, если названа, иначе null."},
-			"category": map[string]any{"type": []string{"string", "null"}, "enum": []any{"food", "transport", "housing", "entertainment", "health", "shopping", "other", nil}, "description": "Категория траты, если названа, иначе null."},
+			"category": map[string]any{"type": []string{"string", "null"}, "enum": categoryEnum(true), "description": "Категория траты, если названа, иначе null."},
 			"spent_at": map[string]any{"type": []string{"string", "null"}, "description": "Дата траты YYYY-MM-DD, если названа, иначе null."},
 			"comment":  map[string]any{"type": []string{"string", "null"}, "description": "Предмет покупки или услуга, если названы, иначе null."},
 		},
@@ -55,7 +57,7 @@ func deleteExpenseTool() responses.ToolUnionParam {
 func editExpenseTool() responses.ToolUnionParam {
 	category := map[string]any{
 		"type": []string{"string", "null"},
-		"enum": []any{"food", "transport", "housing", "entertainment", "health", "shopping", "other", nil},
+		"enum": categoryEnum(true),
 	}
 	parameters := map[string]any{
 		"type": "object",
@@ -123,11 +125,23 @@ func viewFilterProperties() map[string]any {
 	return map[string]any{
 		"categories": map[string]any{
 			"type":        "array",
-			"items":       map[string]any{"type": "string", "enum": []string{"food", "transport", "housing", "entertainment", "health", "shopping", "other"}},
+			"items":       map[string]any{"type": "string", "enum": categoryEnum(false)},
 			"description": "Все названные категории; если категорий нет, пустой массив.",
 		},
 		"comment":   map[string]any{"type": []string{"string", "null"}, "description": "Предмет покупки или услуга из запроса, иначе null."},
 		"date_from": map[string]any{"type": []string{"string", "null"}, "description": "Начало периода YYYY-MM-DD включительно, иначе null."},
 		"date_to":   map[string]any{"type": []string{"string", "null"}, "description": "Конец периода YYYY-MM-DD включительно, иначе null."},
 	}
+}
+
+func categoryEnum(nullable bool) []any {
+	categories := expense.AllCategories()
+	values := make([]any, 0, len(categories)+1)
+	for _, category := range categories {
+		values = append(values, string(category))
+	}
+	if nullable {
+		values = append(values, nil)
+	}
+	return values
 }

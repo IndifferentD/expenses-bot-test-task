@@ -14,13 +14,9 @@ import (
 	"expenses-bot/backend/internal/expense"
 )
 
-type Interpreter interface {
-	Interpret(context.Context, string, time.Time) (*llm.Call, error)
-}
-
 // Service выполняет выбранное моделью действие и формирует ответы для Telegram.
 type Service struct {
-	interpreter Interpreter
+	interpreter *llm.Interpreter
 	expenses    *expense.Service
 	location    *time.Location
 }
@@ -30,7 +26,7 @@ type Reply struct {
 	RichHTML string
 }
 
-func NewService(interpreter Interpreter, expenses *expense.Service, location *time.Location) *Service {
+func NewService(interpreter *llm.Interpreter, expenses *expense.Service, location *time.Location) *Service {
 	return &Service{interpreter: interpreter, expenses: expenses, location: location}
 }
 
@@ -44,7 +40,7 @@ func (s *Service) ProcessMessage(ctx context.Context, userID int64, message stri
 		// TODO: Учитывать текстовый ответ модели: общая фраза скрывает причину отказа или просьбу уточнить запрос.
 		return []Reply{{Text: "Я могу только добавлять, просматривать, изменять и удалять траты. Пожалуйста, уточните запрос."}}, nil
 	}
-	slog.DebugContext(ctx, "selected assistant tool", "user_id", userID, "tool", call.Name, "arguments", call.Arguments)
+	slog.Debug("selected assistant tool", "user_id", userID, "tool", call.Name, "arguments", call.Arguments)
 	switch call.Name {
 	case llm.ToolAddExpense:
 		var input addExpenseInput

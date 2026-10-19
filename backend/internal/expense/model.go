@@ -20,13 +20,28 @@ const (
 	CategoryOther         Category = "other"
 )
 
+var categories = [...]Category{
+	CategoryFood,
+	CategoryTransport,
+	CategoryHousing,
+	CategoryEntertainment,
+	CategoryHealth,
+	CategoryShopping,
+	CategoryOther,
+}
+
+// AllCategories возвращает копию набора допустимых категорий.
+func AllCategories() []Category {
+	return append([]Category(nil), categories[:]...)
+}
+
 func (c Category) Valid() bool {
-	switch c {
-	case CategoryFood, CategoryTransport, CategoryHousing, CategoryEntertainment, CategoryHealth, CategoryShopping, CategoryOther:
-		return true
-	default:
-		return false
+	for _, category := range categories {
+		if c == category {
+			return true
+		}
 	}
+	return false
 }
 
 type Expense struct {

@@ -89,16 +89,11 @@ func (s *Interpreter) Interpret(ctx context.Context, message string, sentAt time
 	if err != nil {
 		var apiErr *openai.Error
 		if errors.As(err, &apiErr) {
-			if slog.Default().Enabled(ctx, slog.LevelDebug) {
-				slog.DebugContext(ctx, "received OpenAI error response", "model", s.model, "input", message, "response", json.RawMessage(apiErr.RawJSON()))
-			}
 			return nil, fmt.Errorf("failed to request OpenAI response (code: %q, message: %q): %w", apiErr.Code, apiErr.Message, err)
 		}
 		return nil, fmt.Errorf("failed to request OpenAI response: %w", err)
 	}
-	if slog.Default().Enabled(ctx, slog.LevelDebug) {
-		slog.DebugContext(ctx, "received OpenAI response", "model", s.model, "input", message, "response", json.RawMessage(response.RawJSON()))
-	}
+	slog.Debug("received OpenAI response", "model", s.model, "input", message, "response", json.RawMessage(response.RawJSON()))
 	if response.Status != responses.ResponseStatusCompleted {
 		return nil, fmt.Errorf("failed to complete OpenAI response: status %s", response.Status)
 	}
@@ -114,7 +109,7 @@ func (s *Interpreter) Interpret(ctx context.Context, message string, sentAt time
 		selected = &Call{Name: call.Name, Arguments: call.Arguments}
 	}
 	if selected == nil {
-		slog.WarnContext(ctx, "OpenAI response selected no tool", "model", s.model, "input", message, "output_text", response.OutputText())
+		slog.Warn("could not select any tool", "model", s.model, "input", message, "output_text", response.OutputText())
 	}
 	return selected, nil
 }
